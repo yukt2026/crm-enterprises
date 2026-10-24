@@ -1,0 +1,6 @@
+{
+  "name": "Enterprise CRM SaaS",
+  "description": "A production-ready Enterprise CRM SaaS platform for managing users, roles, leads, sales pipelines, deals, invoices, support tickets, and tracking analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

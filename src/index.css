@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Set high contrast colors for body in light mode */
+html:not(.dark) body {
+  color: #090d16 !important; /* Deep black-blue */
+}
+
+/* Absolute safeguard to map light mode colors to accessible and rich dark text colors */
+html:not(.dark) .text-slate-400 {
+  color: #475569 !important; /* High-contrast Slate 600 */
+}
+
+html:not(.dark) .text-slate-500 {
+  color: #334155 !important; /* High-contrast Slate 700 */
+}
+
+html:not(.dark) .text-slate-300 {
+  color: #1e293b !important; /* High-contrast Slate 800 */
+}
+
+html:not(.dark) .text-slate-200 {
+  color: #0f172a !important; /* High-contrast Slate 900 */
+}
+
+html:not(.dark) .text-slate-100 {
+  color: #020617 !important; /* High-contrast Slate 950 */
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #475569 !important; /* Highly visible placeholders */
+}
+
