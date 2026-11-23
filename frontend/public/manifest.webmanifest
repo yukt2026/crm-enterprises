@@ -1,0 +1,56 @@
+{
+  "name": "Nexus Enterprise AI CRM SaaS",
+  "short_name": "Nexus CRM",
+  "description": "Unified Omnichannel Enterprise CRM, AI Voice Telephony, Lead Pipeline & Workflow Automation",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Unified Inbox",
+      "short_name": "Inbox",
+      "description": "Access omnichannel WhatsApp, Email, SMS and Website Chat conversations",
+      "url": "/?module=inbox",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Leads Pipeline",
+      "short_name": "Leads",
+      "description": "View and manage active sales leads and conversions",
+      "url": "/?module=leads",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tasks Manager",
+      "short_name": "Tasks",
+      "description": "Daily operational tasks, checklists and team follow-ups",
+      "url": "/?module=tasks",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Executive Dashboard",
+      "short_name": "Dashboard",
+      "description": "Real-time KPIs, sales forecasting and revenue analytics",
+      "url": "/?module=dashboard",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,214 @@
+openapi: 3.0.3
+info:
+  title: Enterprise AI CRM SaaS REST API
+  description: Modular Monolith REST API for Multi-Tenant Enterprise CRM SaaS platform powered by Laravel 12.
+  version: 1.0.0
+servers:
+  - url: http://127.0.0.1:8000/api/v1
+    description: Local Development Server
+  - url: https://api.crm-enterprises.com/v1
+    description: Production Cluster
+paths:
+  /health:
+    get:
+      summary: System Health Diagnostics
+      description: Returns health status, database latency, cache and queue operational states.
+      responses:
+        '200':
+          description: System is healthy and operational.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /auth/login:
+    post:
+      summary: User Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john@nexus.com
+                password:
+                  type: string
+                  format: password
+                  example: AdminSecurePass2026!
+      responses:
+        '200':
+          description: Login successful or 2FA challenge initiated.
+        '401':
+          description: Invalid email or password.
+
+  /auth/verify-2fa:
+    post:
+      summary: Verify Two-Factor Authentication Passcode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, code]
+              properties:
+                user_id:
+                  type: string
+                  example: "1"
+                code:
+                  type: string
+                  example: "123456"
+      responses:
+        '200':
+          description: Passcode verified, bearer token issued.
+
+  /auth/profile:
+    get:
+      summary: Get Current User Profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profile object returned.
+
+  /crm/leads:
+    get:
+      summary: List Leads
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          description: Search term
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [new, contacted, qualified, lost]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Paginated leads collection.
+    post:
+      summary: Create New Lead
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadInput'
+      responses:
+        '201':
+          description: Lead created.
+
+  /crm/deals:
+    get:
+      summary: List Deals
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Paginated deals collection.
+    post:
+      summary: Create Deal
+      security:
+        - BearerAuth: []
+      responses:
+        '201':
+          description: Deal created.
+
+  /crm/reports:
+    get:
+      summary: Get Dashboard KPI Summary and Charts
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Report summary and chart trajectories.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        status_code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: System health diagnostics
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: healthy
+            version:
+              type: string
+              example: 1.0.0
+            services:
+              type: object
+              properties:
+                database:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      example: connected
+                    latency_ms:
+                      type: number
+                      example: 14.2
+
+    LeadInput:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+          example: Acme Upgrade Deal
+        company_name:
+          type: string
+          example: Acme Corporation
+        email:
+          type: string
+          example: procurement@acme.com
+        phone:
+          type: string
+          example: +1 (555) 019-2834
+        estimated_value:
+          type: number
+          example: 45000.00
+        status:
+          type: string
+          enum: [new, contacted, qualified, lost]
+          example: qualified
+        source:
+          type: string
+          example: Direct Inbound
