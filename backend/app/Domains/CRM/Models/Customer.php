@@ -22,6 +22,7 @@ class Customer extends Model
         'company_id',
         'contact_id',
         'lead_id',
+        'branch_id',
         'name',
         'email',
         'phone',
@@ -44,6 +45,16 @@ class Customer extends Model
         return $this->belongsTo(Contact::class);
     }
 
+    public function account(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Domains\CustomerPortal\Models\CustomerAccount::class, 'customer_id');
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'branch_id');
+    }
+
     public function lead(): BelongsTo
     {
         return $this->belongsTo(Lead::class);
@@ -57,5 +68,15 @@ class Customer extends Model
     public function mediaFiles(): MorphMany
     {
         return $this->morphMany(MediaFile::class, 'fileable');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Finance\Models\Invoice::class, 'customer_id');
+    }
+
+    public function deals(): HasMany
+    {
+        return $this->hasMany(\App\Domains\CRM\Models\Deal::class, 'customer_id');
     }
 }

@@ -96,13 +96,17 @@ class IncomingCallManagerService
         // 4. Pending Follow-ups
         $pendingFollowups = [];
         if ($lead) {
-            $pendingFollowups = LeadFollowup::where('tenant_id', $tenantId)
-                ->where('lead_id', $lead->id)
-                ->where('status', 'scheduled')
-                ->orderBy('scheduled_at', 'asc')
-                ->take(3)
-                ->get(['id', 'followup_type', 'scheduled_at', 'title'])
-                ->toArray();
+            try {
+                $pendingFollowups = LeadFollowup::where('tenant_id', $tenantId)
+                    ->where('lead_id', $lead->id)
+                    ->where('status', 'scheduled')
+                    ->orderBy('scheduled_at', 'asc')
+                    ->take(3)
+                    ->get(['id', 'followup_type', 'scheduled_at', 'status'])
+                    ->toArray();
+            } catch (\Throwable $e) {
+                $pendingFollowups = [];
+            }
         }
 
         // 5. Open Support Tickets

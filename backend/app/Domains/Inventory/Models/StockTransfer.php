@@ -20,14 +20,24 @@ class StockTransfer extends Model
         'transfer_number',
         'status',
         'user_id',
+        'approved_by',
+        'approved_at',
+        'dispatched_by',
+        'dispatched_at',
+        'received_by',
+        'damaged_quantity',
+        'damage_notes',
         'shipped_at',
         'received_at',
         'notes',
     ];
 
     protected $casts = [
+        'approved_at' => 'datetime',
+        'dispatched_at' => 'datetime',
         'shipped_at' => 'datetime',
         'received_at' => 'datetime',
+        'damaged_quantity' => 'decimal:2',
     ];
 
     public function sourceWarehouse(): BelongsTo
@@ -43,6 +53,21 @@ class StockTransfer extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function dispatcher(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'dispatched_by');
+    }
+
+    public function receiver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
     }
 
     public function items(): HasMany

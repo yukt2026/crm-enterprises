@@ -16,11 +16,15 @@ class StockTransferItem extends Model
         'product_id',
         'product_variant_id',
         'quantity',
+        'received_quantity',
+        'damaged_quantity',
         'notes',
     ];
 
     protected $casts = [
         'quantity' => 'decimal:2',
+        'received_quantity' => 'decimal:2',
+        'damaged_quantity' => 'decimal:2',
     ];
 
     public function transfer(): BelongsTo

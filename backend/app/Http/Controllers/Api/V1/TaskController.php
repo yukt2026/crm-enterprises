@@ -6,6 +6,7 @@ use App\Domains\CRM\Models\CrmActivity;
 use App\Domains\CRM\Services\SalesTeamService;
 use App\Domains\Communications\Services\NotificationService;
 use App\Domains\Projects\Models\Task;
+use App\Domains\Projects\Models\TaskTimeLog;
 use App\Domains\Projects\Services\TaskService;
 use App\Domains\Tenancy\Services\TenantContext;
 use App\Http\Controllers\Controller;
@@ -36,7 +37,7 @@ class TaskController extends Controller
         $user = auth()->user();
 
         $query = Task::where('tenant_id', $tenantId)
-            ->with(['assignedUser', 'creator', 'lead', 'deal', 'contact', 'company', 'project', 'dependsOnTasks', 'timeLogs']);
+            ->with(['assignedUser', 'assignees', 'creator', 'lead', 'deal', 'contact', 'company', 'project', 'dependsOnTasks', 'subtasks', 'milestone', 'timeLogs']);
 
         // View scope filters
         $view = $request->get('view', 'all');
@@ -66,8 +67,20 @@ class TaskController extends Controller
             $query->where('project_id', $request->project_id);
         }
 
+        if ($request->filled('milestone_id')) {
+            $query->where('milestone_id', $request->milestone_id);
+        }
+
+        if ($request->filled('parent_task_id')) {
+            $query->where('parent_task_id', $request->parent_task_id);
+        }
+
         if ($request->filled('assigned_user_id')) {
             $query->where('assigned_user_id', $request->assigned_user_id);
+        }
+
+        if ($request->boolean('is_blocked')) {
+            $query->where('is_blocked', true);
         }
 
         if ($request->filled('lead_id')) {
@@ -83,6 +96,7 @@ class TaskController extends Controller
         }
 
         $query->orderByRaw("CASE WHEN status IN ('done', 'completed') THEN 2 ELSE 1 END")
+              ->orderBy('order_index', 'asc')
               ->orderBy('due_date', 'asc')
               ->orderByDesc('id');
 
@@ -100,6 +114,9 @@ class TaskController extends Controller
             'priority' => 'nullable|in:low,medium,high,urgent',
             'status' => 'nullable|string|in:todo,in_progress,in_review,completed,done,cancelled',
             'assigned_user_id' => 'nullable|exists:users,id',
+            'assignee_ids' => 'nullable|array',
+            'parent_task_id' => 'nullable|exists:tasks,id',
+            'milestone_id' => 'nullable|exists:project_milestones,id',
             'due_date' => 'nullable|date',
             'start_date' => 'nullable|date',
             'estimated_hours' => 'nullable|numeric|min:0',
@@ -107,6 +124,10 @@ class TaskController extends Controller
             'is_recurring' => 'nullable|boolean',
             'recurring_rule' => 'nullable|string|in:daily,weekly,monthly',
             'checklist_items' => 'nullable|array',
+            'labels' => 'nullable|array',
+            'is_blocked' => 'nullable|boolean',
+            'block_reason' => 'nullable|string',
+            'order_index' => 'nullable|integer',
             'lead_id' => 'nullable|exists:leads,id',
             'deal_id' => 'nullable|exists:deals,id',
             'contact_id' => 'nullable|exists:contacts,id',
@@ -140,14 +161,14 @@ class TaskController extends Controller
             );
         }
 
-        return $this->successResponse($task->load(['assignedUser', 'lead', 'deal', 'project']), 'Task created successfully.', 201);
+        return $this->successResponse($task->load(['assignedUser', 'assignees', 'lead', 'deal', 'project', 'milestone']), 'Task created successfully.', 201);
     }
 
     public function show(int $id): JsonResponse
     {
         $tenantId = $this->getTenantId();
         $task = Task::where('tenant_id', $tenantId)
-            ->with(['assignedUser', 'creator', 'lead', 'deal', 'contact', 'company', 'project', 'dependsOnTasks', 'blockingTasks', 'timeLogs.user'])
+            ->with(['assignedUser', 'assignees', 'creator', 'lead', 'deal', 'contact', 'company', 'project', 'milestone', 'subtasks.assignedUser', 'parentTask', 'dependsOnTasks', 'blockingTasks', 'timeLogs.user'])
             ->findOrFail($id);
 
         return $this->successResponse($task);
@@ -164,17 +185,24 @@ class TaskController extends Controller
             'priority' => 'sometimes|in:low,medium,high,urgent',
             'status' => 'sometimes|in:todo,in_progress,in_review,completed,done,cancelled',
             'assigned_user_id' => 'nullable|exists:users,id',
+            'assignee_ids' => 'nullable|array',
+            'parent_task_id' => 'nullable|exists:tasks,id',
+            'milestone_id' => 'nullable|exists:project_milestones,id',
             'due_date' => 'nullable|date',
             'start_date' => 'nullable|date',
             'estimated_hours' => 'nullable|numeric|min:0',
             'reminder_at' => 'nullable|date',
             'checklist_items' => 'nullable|array',
+            'labels' => 'nullable|array',
+            'is_blocked' => 'nullable|boolean',
+            'block_reason' => 'nullable|string',
+            'order_index' => 'nullable|integer',
             'project_id' => 'nullable|exists:projects,id',
         ]);
 
         $task = $this->taskService->updateTask($task, $validated);
 
-        return $this->successResponse($task->load(['assignedUser', 'lead', 'deal', 'project']), 'Task updated successfully.');
+        return $this->successResponse($task->load(['assignedUser', 'assignees', 'lead', 'deal', 'project', 'milestone', 'subtasks']), 'Task updated successfully.');
     }
 
     /**
@@ -231,7 +259,7 @@ class TaskController extends Controller
         return $this->successResponse(null, 'Selected tasks deleted successfully.');
     }
 
-    // --- TIME LOGGING ---
+    // --- TIME LOGGING & LIVE TIMER ---
 
     public function logTime(Request $request, int $id): JsonResponse
     {
@@ -244,6 +272,7 @@ class TaskController extends Controller
             'end_time' => 'nullable|date',
             'description' => 'nullable|string',
             'is_billable' => 'nullable|boolean',
+            'hourly_rate' => 'nullable|numeric|min:0',
         ]);
 
         $log = $this->taskService->logTime($task, auth()->id() ?? 1, $validated);
@@ -251,12 +280,82 @@ class TaskController extends Controller
         return $this->successResponse($log->load('user'), 'Time logged successfully.', 201);
     }
 
+    public function startTimer(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $task = Task::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $log = $this->taskService->startTimer($task, auth()->id() ?? 1);
+
+        return $this->successResponse($log->load(['task', 'user']), 'Live timer started.', 201);
+    }
+
+    public function stopTimer(Request $request, int $logId): JsonResponse
+    {
+        $validated = $request->validate([
+            'description' => 'nullable|string',
+        ]);
+
+        $log = $this->taskService->stopTimer($logId, auth()->id() ?? 1, $validated['description'] ?? null);
+
+        return $this->successResponse($log->load(['task', 'user']), 'Live timer stopped.');
+    }
+
+    public function approveTimeLog(Request $request, int $logId): JsonResponse
+    {
+        $log = $this->taskService->approveTimeLog($logId, auth()->id() ?? 1);
+
+        return $this->successResponse($log->load(['approvedByUser', 'user', 'task']), 'Time log approved successfully.');
+    }
+
+    public function rejectTimeLog(Request $request, int $logId): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        $log = $this->taskService->rejectTimeLog($logId, auth()->id() ?? 1, $validated['reason']);
+
+        return $this->successResponse($log->load(['approvedByUser', 'user', 'task']), 'Time log rejected.');
+    }
+
     public function timeLogs(int $id): JsonResponse
     {
         $tenantId = $this->getTenantId();
         $task = Task::where('tenant_id', $tenantId)->findOrFail($id);
 
-        return $this->successResponse($task->timeLogs()->with('user')->latest()->get());
+        return $this->successResponse($task->timeLogs()->with(['user', 'approvedByUser'])->latest()->get());
+    }
+
+    public function allTimesheets(Request $request): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+
+        $query = TaskTimeLog::where('tenant_id', $tenantId)->with(['user', 'task.project', 'approvedByUser']);
+
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        if ($request->filled('project_id')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('project_id', $request->project_id)
+                  ->orWhereHas('task', fn($t) => $t->where('project_id', $request->project_id));
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->boolean('is_running')) {
+            $query->where('is_running', true);
+        }
+
+        $query->orderByDesc('id');
+
+        $perPage = (int) $request->get('limit', $request->get('per_page', 25));
+        return $this->paginatedResponse($query->paginate($perPage));
     }
 
     // --- DEPENDENCIES ---
@@ -280,12 +379,14 @@ class TaskController extends Controller
         $validated = $request->validate([
             'depends_on_task_id' => 'required|exists:tasks,id',
             'dependency_type' => 'nullable|string|in:finish_to_start,start_to_start',
+            'lag_days' => 'nullable|integer|min:0',
         ]);
 
         $dep = $this->taskService->addDependency(
             $task,
             $validated['depends_on_task_id'],
-            $validated['dependency_type'] ?? 'finish_to_start'
+            $validated['dependency_type'] ?? 'finish_to_start',
+            (int) ($validated['lag_days'] ?? 0)
         );
 
         return $this->successResponse($dep->load('dependsOnTask'), 'Dependency added successfully.', 201);

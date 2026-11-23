@@ -29,8 +29,18 @@ import {
   HelpCircle,
   RefreshCw,
   Globe,
+  Compass,
+  Bell,
+  FileBarChart,
+  Crown,
 } from 'lucide-react';
 import { AnalyticsTrackingSdkGa4View } from './AnalyticsTrackingSdkGa4View';
+import { OwnerExecutiveBiTab } from '../analytics/OwnerExecutiveBiTab';
+import { CustomReportBuilderTab } from '../analytics/CustomReportBuilderTab';
+import { AiBusinessInsightsTab } from '../analytics/AiBusinessInsightsTab';
+import { CustomAlertsTab } from '../analytics/CustomAlertsTab';
+import { FieldSalesTab } from '../analytics/FieldSalesTab';
+import { IndiaFirstTab } from '../analytics/IndiaFirstTab';
 import {
   useExecutiveAnalytics,
   useLeadAnalytics,
@@ -44,7 +54,20 @@ import {
 import { api } from '../../api/client';
 
 export const AnalyticsReportingHubView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'executive' | 'leads' | 'sales' | 'attribution' | 'reports' | 'tracking_ga4'>('executive');
+  const [activeTab, setActiveTab] = useState<
+    | 'owner_bi'
+    | 'report_builder'
+    | 'ai_insights'
+    | 'custom_alerts'
+    | 'field_sales'
+    | 'india_first'
+    | 'executive'
+    | 'leads'
+    | 'sales'
+    | 'attribution'
+    | 'reports'
+    | 'tracking_ga4'
+  >('owner_bi');
   
   // Date range filters
   const [dateRangePreset, setDateRangePreset] = useState<'7d' | '30d' | '90d' | 'custom'>('30d');
@@ -266,6 +289,78 @@ export const AnalyticsReportingHubView: React.FC = () => {
       {/* Tabs Navigation */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 space-x-1 sm:space-x-4 overflow-x-auto">
         <button
+          onClick={() => setActiveTab('owner_bi')}
+          className={`flex items-center gap-2 py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'owner_bi'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Crown className="w-4 h-4 text-amber-500" />
+          Owner BI Cockpit
+        </button>
+
+        <button
+          onClick={() => setActiveTab('report_builder')}
+          className={`flex items-center gap-2 py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'report_builder'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <FileBarChart className="w-4 h-4 text-blue-500" />
+          Custom Report Builder
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ai_insights')}
+          className={`flex items-center gap-2 py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'ai_insights'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-purple-400" />
+          AI Business Insights
+        </button>
+
+        <button
+          onClick={() => setActiveTab('custom_alerts')}
+          className={`flex items-center gap-2 py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'custom_alerts'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Bell className="w-4 h-4 text-amber-400" />
+          KPI Alerts
+        </button>
+
+        <button
+          onClick={() => setActiveTab('field_sales')}
+          className={`flex items-center gap-2 py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'field_sales'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Compass className="w-4 h-4 text-emerald-400" />
+          Field Sales GPS
+        </button>
+
+        <button
+          onClick={() => setActiveTab('india_first')}
+          className={`flex items-center gap-2 py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'india_first'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Globe className="w-4 h-4 text-orange-400" />
+          India-First & Languages
+        </button>
+
+        <button
           onClick={() => setActiveTab('executive')}
           className={`flex items-center gap-2 py-3 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'executive'
@@ -337,6 +432,36 @@ export const AnalyticsReportingHubView: React.FC = () => {
           Website Tracking SDK & GA4
         </button>
       </div>
+
+      {/* OWNER EXECUTIVE BI COCKPIT */}
+      {activeTab === 'owner_bi' && (
+        <OwnerExecutiveBiTab fromDate={fromDate} toDate={toDate} />
+      )}
+
+      {/* CUSTOM REPORT BUILDER */}
+      {activeTab === 'report_builder' && (
+        <CustomReportBuilderTab fromDate={fromDate} toDate={toDate} />
+      )}
+
+      {/* AI BUSINESS INSIGHTS */}
+      {activeTab === 'ai_insights' && (
+        <AiBusinessInsightsTab fromDate={fromDate} toDate={toDate} />
+      )}
+
+      {/* CUSTOM ANALYTICS ALERTS */}
+      {activeTab === 'custom_alerts' && (
+        <CustomAlertsTab />
+      )}
+
+      {/* FIELD SALES & GPS TRACKING */}
+      {activeTab === 'field_sales' && (
+        <FieldSalesTab />
+      )}
+
+      {/* INDIA FIRST & LOCALIZATION */}
+      {activeTab === 'india_first' && (
+        <IndiaFirstTab />
+      )}
 
       {/* TAB 1: EXECUTIVE KPI DASHBOARD */}
       {activeTab === 'executive' && (

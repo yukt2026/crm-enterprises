@@ -7,6 +7,9 @@ import {
   WorkflowTemplateItem,
   WorkflowSimulationResult,
   WorkflowDefinition,
+  WorkflowApprovalItem,
+  WorkflowAutomationLimitItem,
+  WorkflowMetricsItem,
 } from '../api/types';
 
 // ==========================================
@@ -260,5 +263,120 @@ export function useTriggerManualWorkflow() {
       queryClient.invalidateQueries({ queryKey: ['workflow-runs'] });
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
     },
+  });
+}
+
+// ==========================================
+// 4. WORKFLOW APPROVALS HOOKS
+// ==========================================
+
+export function useWorkflowApprovals(params?: {
+  status?: string;
+  category?: string;
+  approver_role?: string;
+  page?: number;
+  per_page?: number;
+}) {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['workflow-approvals', workspaceId, params],
+    queryFn: async () => {
+      const res = await api.getWorkflowApprovals(params);
+      return (res.data || []) as WorkflowApprovalItem[];
+    },
+  });
+}
+
+export function useWorkflowApproval(id: number | null | undefined) {
+  return useQuery({
+    queryKey: ['workflow-approval', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const res = await api.getWorkflowApproval(id);
+      return res.data as WorkflowApprovalItem;
+    },
+    enabled: Boolean(id),
+  });
+}
+
+export function useDecideWorkflowApproval() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      decision,
+      comments,
+    }: {
+      id: number;
+      decision: 'approve' | 'reject';
+      comments?: string;
+    }) => {
+      const res = await api.decideWorkflowApproval(id, { decision, comments });
+      return res.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['workflow-approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-approval', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-metrics'] });
+    },
+  });
+}
+
+// ==========================================
+// 5. WORKFLOW LIMITS & METRICS HOOKS
+// ==========================================
+
+export function useWorkflowLimits() {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['workflow-limits', workspaceId],
+    queryFn: async () => {
+      const res = await api.getWorkflowLimits();
+      return res.data;
+    },
+  });
+}
+
+export function useUpdateWorkflowLimits() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Partial<WorkflowAutomationLimitItem>) => {
+      const res = await api.updateWorkflowLimits(data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflow-limits'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-metrics'] });
+    },
+  });
+}
+
+export function useWorkflowMetrics() {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['workflow-metrics', workspaceId],
+    queryFn: async () => {
+      const res = await api.getWorkflowMetrics();
+      return res.data as WorkflowMetricsItem;
+    },
+    refetchInterval: 15000,
+  });
+}
+
+export function useWorkflowTriggersCatalog() {
+  return useQuery({
+    queryKey: ['workflow-triggers-catalog'],
+    queryFn: async () => {
+      const res = await api.getWorkflowTriggersCatalog();
+      return res.data as Record<string, any>;
+    },
+    staleTime: 1000 * 60 * 30, // 30 minutes cache
   });
 }

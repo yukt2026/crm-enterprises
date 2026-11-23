@@ -12,6 +12,8 @@ class ProjectDocument extends Model
 {
     use HasFactory, BelongsToTenant;
 
+    protected $appends = ['name'];
+
     protected $fillable = [
         'tenant_id',
         'project_id',
@@ -26,6 +28,11 @@ class ProjectDocument extends Model
         'is_client_visible',
         'notes',
     ];
+
+    public function getNameAttribute(): string
+    {
+        return $this->title ?? $this->file_name ?? '';
+    }
 
     protected $casts = [
         'is_client_visible' => 'boolean',

@@ -21,6 +21,7 @@ class Contact extends Model
         'tenant_id',
         'company_id',
         'lead_id',
+        'branch_id',
         'name',
         'email',
         'email_addresses',
@@ -52,6 +53,11 @@ class Contact extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'branch_id');
     }
 
     public function lead(): BelongsTo

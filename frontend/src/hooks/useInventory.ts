@@ -374,3 +374,352 @@ export function useReceivePurchaseOrderGoods() {
     },
   });
 }
+
+// ==========================================
+// 4. ADVANCED INVENTORY, TRANSFERS & RECONCILIATIONS
+// ==========================================
+
+export function useInventorySettings() {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['inventory-settings', workspaceId],
+    queryFn: async () => {
+      const res = await api.getInventorySettings();
+      return res.data;
+    },
+  });
+}
+
+export function useUpdateInventorySettings() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (data: any) => api.updateInventorySettings(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-settings'] });
+      addToast('Inventory settings updated', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to update settings', 'error');
+    },
+  });
+}
+
+export function useTransfers(params: { status?: string } = {}) {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['inventory-transfers', workspaceId, params],
+    queryFn: async () => {
+      const res = await api.getTransfers(params);
+      return res.data || [];
+    },
+  });
+}
+
+export function useCreateTransferRequest() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (data: any) => api.createTransferRequest(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-transfers'] });
+      addToast('Stock transfer request created', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to create transfer request', 'error');
+    },
+  });
+}
+
+export function useApproveTransfer() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (id: number) => api.approveTransfer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-transfers'] });
+      addToast('Transfer approved', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to approve transfer', 'error');
+    },
+  });
+}
+
+export function useDispatchTransfer() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (id: number) => api.dispatchTransfer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stocks'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-ledger'] });
+      addToast('Transfer dispatched into transit', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to dispatch transfer', 'error');
+    },
+  });
+}
+
+export function useReceiveTransfer() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => api.receiveTransfer(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stocks'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-valuation'] });
+      addToast('Transfer received and processed', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to receive transfer', 'error');
+    },
+  });
+}
+
+export function useReconciliations() {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['inventory-reconciliations', workspaceId],
+    queryFn: async () => {
+      const res = await api.getReconciliations();
+      return res.data || [];
+    },
+  });
+}
+
+export function useCreateReconciliation() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (data: any) => api.createReconciliation(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-reconciliations'] });
+      addToast('Stock reconciliation count initiated', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to create reconciliation', 'error');
+    },
+  });
+}
+
+export function useApplyReconciliation() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (id: number) => api.applyReconciliation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-reconciliations'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stocks'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-valuation'] });
+      addToast('Reconciliation adjustments applied to stock', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to apply reconciliation', 'error');
+    },
+  });
+}
+
+export function useReorderReport(warehouseId?: number) {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['inventory-reorder-report', workspaceId, warehouseId],
+    queryFn: async () => {
+      const res = await api.getReorderReport(warehouseId);
+      return res.data;
+    },
+  });
+}
+
+export function useProfitabilityReport() {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['inventory-profitability', workspaceId],
+    queryFn: async () => {
+      const res = await api.getProductProfitabilityReport();
+      return res.data;
+    },
+  });
+}
+
+// ==========================================
+// 5. PROCUREMENT: PURCHASE REQUESTS & GRN
+// ==========================================
+
+export function usePurchaseRequests(params: { status?: string } = {}) {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['procurement-purchase-requests', workspaceId, params],
+    queryFn: async () => {
+      const res = await api.getPurchaseRequests(params);
+      return res.data || [];
+    },
+  });
+}
+
+export function useCreatePurchaseRequest() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (data: any) => api.createPurchaseRequest(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['procurement-purchase-requests'] });
+      addToast('Purchase request submitted for approval', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to submit purchase request', 'error');
+    },
+  });
+}
+
+export function useApprovePurchaseRequest() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (id: number) => api.approvePurchaseRequest(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['procurement-purchase-requests'] });
+      addToast('Purchase request approved', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to approve request', 'error');
+    },
+  });
+}
+
+export function useGoodsReceiptNotes() {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['procurement-grns', workspaceId],
+    queryFn: async () => {
+      const res = await api.getGoodsReceiptNotes();
+      return res.data || [];
+    },
+  });
+}
+
+export function useCreateBillFromPO() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data?: any }) => api.createBillFromPO(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['procurement-purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor-bills'] });
+      addToast('Vendor bill created and linked to Finance', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to generate vendor bill', 'error');
+    },
+  });
+}
+
+// ==========================================
+// 6. CUSTOMER RETURNS & RMA
+// ==========================================
+
+export function useCustomerReturns(params: { status?: string } = {}) {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['customer-returns', workspaceId, params],
+    queryFn: async () => {
+      const res = await api.getCustomerReturns(params);
+      return res.data || [];
+    },
+  });
+}
+
+export function useCreateCustomerReturn() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (data: any) => api.createCustomerReturn(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-returns'] });
+      addToast('Customer RMA return request created', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to create return request', 'error');
+    },
+  });
+}
+
+export function useInspectCustomerReturn() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => api.inspectCustomerReturn(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-returns'] });
+      addToast('Return inspection completed', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to submit inspection', 'error');
+    },
+  });
+}
+
+export function useApproveCustomerReturn() {
+  const queryClient = useQueryClient();
+  const addToast = useCRMStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (id: number) => api.approveCustomerReturn(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stocks'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] });
+      addToast('Return approved and restocked / quarantined', 'success');
+    },
+    onError: (err: any) => {
+      addToast(err.message || 'Failed to approve return', 'error');
+    },
+  });
+}
+
+export function useCustomerReturnsReport() {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['customer-returns-report', workspaceId],
+    queryFn: async () => {
+      const res = await api.getCustomerReturnsReport();
+      return res.data;
+    },
+  });
+}

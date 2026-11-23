@@ -10,6 +10,9 @@ use App\Http\Controllers\Api\V1\ApiKeyController;
 use App\Http\Controllers\Api\V1\AttendanceController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BranchController;
+use App\Http\Controllers\Api\V1\BookableServiceController;
+use App\Http\Controllers\Api\V1\CustomerPortalController;
 use App\Http\Controllers\Api\V1\CompanyController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\ContractController;
@@ -17,6 +20,7 @@ use App\Http\Controllers\Api\V1\CrmActivityController;
 use App\Http\Controllers\Api\V1\CustomDomainController;
 use App\Http\Controllers\Api\V1\CustomFieldController;
 use App\Http\Controllers\Api\V1\CustomerController;
+use App\Http\Controllers\Api\V1\CustomerReturnController;
 use App\Http\Controllers\Api\V1\CustomerSuccessController;
 use App\Http\Controllers\Api\V1\DealController;
 use App\Http\Controllers\Api\V1\DepartmentController;
@@ -46,6 +50,8 @@ use App\Http\Controllers\Api\V1\MarketingSegmentController;
 use App\Http\Controllers\Api\V1\MarketingTemplateController;
 use App\Http\Controllers\Api\V1\MediaFileController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\PortalSettingController;
+use App\Http\Controllers\Api\V1\PublicBookingController;
 use App\Http\Controllers\Api\V1\OmnichannelChannelConfigController;
 use App\Http\Controllers\Api\V1\OmnichannelInboxController;
 use App\Http\Controllers\Api\V1\OpenApiController;
@@ -60,6 +66,8 @@ use App\Http\Controllers\Api\V1\PipelineController;
 use App\Http\Controllers\Api\V1\ProcurementController;
 use App\Http\Controllers\Api\V1\ProductCatalogController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\ProjectMilestoneController;
+use App\Http\Controllers\Api\V1\ProjectDocumentController;
 use App\Http\Controllers\Api\V1\PublicLandingPageController;
 use App\Http\Controllers\Api\V1\PublicLeadCaptureController;
 use App\Http\Controllers\Api\V1\QuotationController;
@@ -67,6 +75,16 @@ use App\Http\Controllers\Api\V1\RazorpayBillingWebhookController;
 use App\Http\Controllers\Api\V1\ReceivableController;
 use App\Http\Controllers\Api\V1\MeetingController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\OwnerDashboardController;
+use App\Http\Controllers\Api\V1\CustomReportBuilderController;
+use App\Http\Controllers\Api\V1\SalesMarketingFinanceAnalyticsController;
+use App\Http\Controllers\Api\V1\AiInsightsAlertsController;
+use App\Http\Controllers\Api\V1\FieldSalesController;
+use App\Http\Controllers\Api\V1\IndiaFirstController;
+use App\Http\Controllers\Api\V1\IndustryTemplateController;
+use App\Http\Controllers\Api\V1\SaasOnboardingController;
+use App\Http\Controllers\Api\V1\FeatureEntitlementController;
+use App\Http\Controllers\Api\V1\PlatformSuperAdminConsoleController;
 use App\Http\Controllers\Api\V1\RolePermissionController;
 use App\Http\Controllers\Api\V1\SalesCommissionController;
 use App\Http\Controllers\Api\V1\SalesTeamController;
@@ -111,6 +129,8 @@ use App\Http\Controllers\Api\V1\WorkspaceController;
 use App\Http\Controllers\Api\V1\WebChatPublicController;
 use App\Http\Controllers\Api\V1\WorkflowController;
 use App\Http\Controllers\Api\V1\WorkflowRunController;
+use App\Http\Controllers\Api\V1\WorkflowApprovalController;
+use App\Http\Controllers\Api\V1\WorkflowLimitController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -208,6 +228,66 @@ $registerCrmRoutes = function () {
     Route::prefix('public/landing-pages')->group(function () {
         Route::get('/{slug}', [PublicLandingPageController::class, 'getPage']);
         Route::post('/{slug}/cta-click', [PublicLandingPageController::class, 'trackCtaClick']);
+    });
+
+    // Public / Client Portal Milestone Approvals
+    Route::prefix('portal/milestones')->group(function () {
+        Route::get('/{token}', [ProjectMilestoneController::class, 'getMilestoneByToken']);
+        Route::post('/{token}/approve', [ProjectMilestoneController::class, 'clientApprove']);
+        Route::post('/{token}/revision', [ProjectMilestoneController::class, 'clientRevision']);
+    });
+
+    // Customer Portal Authentication (Public)
+    Route::prefix('portal/auth')->group(function () {
+        Route::post('/register', [CustomerPortalController::class, 'register']);
+        Route::post('/login', [CustomerPortalController::class, 'login']);
+    });
+
+    // Public Online Appointment Booking Page
+    Route::prefix('public/booking')->group(function () {
+        Route::get('/{slug}', [PublicBookingController::class, 'getBookingConfig']);
+        Route::get('/{slug}/slots', [PublicBookingController::class, 'getSlots']);
+        Route::post('/{slug}/book', [PublicBookingController::class, 'book']);
+    });
+
+    // Customer Self-Service Portal (Scoped for Customer Accounts)
+    Route::middleware('auth:sanctum')->prefix('portal')->group(function () {
+        Route::post('/auth/logout', [CustomerPortalController::class, 'logout']);
+        Route::get('/dashboard', [CustomerPortalController::class, 'dashboard']);
+        Route::get('/profile', [CustomerPortalController::class, 'profile']);
+        Route::put('/profile', [CustomerPortalController::class, 'updateProfile']);
+        Route::post('/change-password', [CustomerPortalController::class, 'changePassword']);
+
+        // Quotations
+        Route::get('/quotations', [CustomerPortalController::class, 'quotations']);
+        Route::get('/quotations/{id}', [CustomerPortalController::class, 'showQuotation']);
+        Route::post('/quotations/{id}/accept', [CustomerPortalController::class, 'acceptQuotation']);
+        Route::post('/quotations/{id}/reject', [CustomerPortalController::class, 'rejectQuotation']);
+        Route::post('/quotations/{id}/request-revision', [CustomerPortalController::class, 'requestQuotationChange']);
+
+        // Invoices & Payments
+        Route::get('/invoices', [CustomerPortalController::class, 'invoices']);
+        Route::get('/invoices/{id}', [CustomerPortalController::class, 'showInvoice']);
+        Route::post('/invoices/{id}/pay', [CustomerPortalController::class, 'payInvoice']);
+
+        // Projects & Documents (Strictly Client Visible)
+        Route::get('/projects', [CustomerPortalController::class, 'projects']);
+        Route::get('/projects/{id}', [CustomerPortalController::class, 'showProject']);
+        Route::get('/documents', [CustomerPortalController::class, 'documents']);
+
+        // Support Tickets
+        Route::get('/tickets', [CustomerPortalController::class, 'tickets']);
+        Route::post('/tickets', [CustomerPortalController::class, 'createTicket']);
+        Route::get('/tickets/{id}', [CustomerPortalController::class, 'showTicket']);
+        Route::post('/tickets/{id}/reply', [CustomerPortalController::class, 'replyTicket']);
+        Route::post('/tickets/{id}/feedback', [CustomerPortalController::class, 'feedbackTicket']);
+
+        // Appointments & Services
+        Route::get('/services', [CustomerPortalController::class, 'bookableServices']);
+        Route::get('/appointments', [CustomerPortalController::class, 'appointments']);
+        Route::post('/appointments', [CustomerPortalController::class, 'bookAppointment']);
+        Route::post('/appointments/{id}/reschedule', [CustomerPortalController::class, 'rescheduleAppointment']);
+        Route::post('/appointments/{id}/cancel', [CustomerPortalController::class, 'cancelAppointment']);
     });
 
     // Lead Acquisition Webhooks (Unauthenticated with signature verification)
@@ -365,12 +445,25 @@ $registerCrmRoutes = function () {
 
         // Projects & Milestones
         Route::get('/projects/metrics', [ProjectController::class, 'metrics']);
+        Route::get('/projects/workload', [ProjectController::class, 'workload']);
+        Route::post('/projects/create-from-deal', [ProjectController::class, 'createFromDeal']);
+        Route::post('/projects/create-from-quotation', [ProjectController::class, 'createFromQuotation']);
         Route::post('/projects/{id}/archive', [ProjectController::class, 'archive']);
         Route::post('/projects/{id}/restore', [ProjectController::class, 'restore']);
+        Route::post('/projects/{id}/transition-status', [ProjectController::class, 'transitionStatus']);
+        Route::get('/projects/{id}/financials', [ProjectController::class, 'financials']);
+        Route::get('/projects/{id}/gantt', [ProjectController::class, 'gantt']);
         Route::get('/projects/{id}/milestones', [ProjectController::class, 'milestones']);
         Route::post('/projects/{id}/milestones', [ProjectController::class, 'storeMilestone']);
         Route::put('/projects/{id}/milestones/{milestoneId}', [ProjectController::class, 'updateMilestone']);
         Route::delete('/projects/{id}/milestones/{milestoneId}', [ProjectController::class, 'destroyMilestone']);
+        Route::get('/projects/{projectId}/documents', [ProjectDocumentController::class, 'index']);
+        Route::post('/projects/{projectId}/documents', [ProjectDocumentController::class, 'store']);
+        Route::patch('/project-documents/{id}/visibility', [ProjectDocumentController::class, 'toggleVisibility']);
+        Route::delete('/project-documents/{id}', [ProjectDocumentController::class, 'destroy']);
+        Route::post('/milestones/{id}/submit-review', [ProjectMilestoneController::class, 'submitReview']);
+        Route::post('/milestones/{id}/approve-internal', [ProjectMilestoneController::class, 'approveInternal']);
+        Route::post('/milestones/{id}/send-to-client', [ProjectMilestoneController::class, 'sendToClient']);
         Route::post('/projects/{id}/members', [ProjectController::class, 'addMember']);
         Route::delete('/projects/{id}/members/{userId}', [ProjectController::class, 'removeMember']);
         Route::get('/projects/{id}/comments', [ProjectController::class, 'comments']);
@@ -379,9 +472,14 @@ $registerCrmRoutes = function () {
 
         // Tasks, Dependencies & Time Tracking
         Route::get('/tasks/metrics', [TaskController::class, 'metrics']);
+        Route::get('/tasks/timesheets', [TaskController::class, 'allTimesheets']);
         Route::post('/tasks/bulk-delete', [TaskController::class, 'bulkDelete']);
         Route::post('/tasks/{id}/toggle-checklist', [TaskController::class, 'toggleChecklistItem']);
         Route::post('/tasks/{id}/complete', [TaskController::class, 'complete']);
+        Route::post('/tasks/{id}/start-timer', [TaskController::class, 'startTimer']);
+        Route::post('/tasks/stop-timer/{logId}', [TaskController::class, 'stopTimer']);
+        Route::post('/tasks/timesheets/{logId}/approve', [TaskController::class, 'approveTimeLog']);
+        Route::post('/tasks/timesheets/{logId}/reject', [TaskController::class, 'rejectTimeLog']);
         Route::get('/tasks/{id}/time-logs', [TaskController::class, 'timeLogs']);
         Route::post('/tasks/{id}/log-time', [TaskController::class, 'logTime']);
         Route::get('/tasks/{id}/dependencies', [TaskController::class, 'dependencies']);
@@ -445,28 +543,70 @@ $registerCrmRoutes = function () {
         Route::apiResource('sales-teams', SalesTeamController::class);
 
         // Product & Service Catalog
+        Route::get('/catalog/export', [ProductCatalogController::class, 'exportCsv']);
+        Route::post('/catalog/import', [ProductCatalogController::class, 'importCsv']);
+        Route::post('/catalog/check-availability', [ProductCatalogController::class, 'checkAvailability']);
+        Route::post('/catalog/{id}/archive', [ProductCatalogController::class, 'archive']);
+        Route::post('/catalog/{id}/unarchive', [ProductCatalogController::class, 'unarchive']);
         Route::get('/catalog/categories', [ProductCatalogController::class, 'categories']);
         Route::post('/catalog/categories', [ProductCatalogController::class, 'createCategory']);
         Route::post('/catalog/{id}/variants', [ProductCatalogController::class, 'createVariant']);
         Route::apiResource('catalog', ProductCatalogController::class);
         Route::apiResource('products', ProductCatalogController::class);
 
-        // Inventory Management
+        // Inventory Management & Warehouses
+        Route::get('/inventory/settings', [InventoryController::class, 'getSettings']);
+        Route::put('/inventory/settings', [InventoryController::class, 'updateSettings']);
         Route::get('/inventory/warehouses', [InventoryController::class, 'warehouses']);
         Route::post('/inventory/warehouses', [InventoryController::class, 'createWarehouse']);
+        Route::get('/inventory/warehouses/{id}', [InventoryController::class, 'showWarehouse']);
+        Route::put('/inventory/warehouses/{id}', [InventoryController::class, 'updateWarehouse']);
         Route::get('/inventory/stocks', [InventoryController::class, 'stocks']);
         Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
         Route::post('/inventory/transfer', [InventoryController::class, 'transfer']);
+        Route::get('/inventory/transfers', [InventoryController::class, 'transfers']);
+        Route::post('/inventory/transfers/request', [InventoryController::class, 'createTransferRequest']);
+        Route::post('/inventory/transfers/{id}/approve', [InventoryController::class, 'approveTransfer']);
+        Route::post('/inventory/transfers/{id}/dispatch', [InventoryController::class, 'dispatchTransfer']);
+        Route::post('/inventory/transfers/{id}/receive', [InventoryController::class, 'receiveTransfer']);
+        Route::post('/inventory/reserve', [InventoryController::class, 'reserve']);
+        Route::post('/inventory/release', [InventoryController::class, 'release']);
+        Route::post('/inventory/issue', [InventoryController::class, 'issue']);
+        Route::get('/inventory/reconciliations', [InventoryController::class, 'reconciliations']);
+        Route::post('/inventory/reconciliations', [InventoryController::class, 'createReconciliation']);
+        Route::post('/inventory/reconciliations/{id}/apply', [InventoryController::class, 'applyReconciliation']);
         Route::get('/inventory/ledger', [InventoryController::class, 'ledger']);
         Route::get('/inventory/valuation', [InventoryController::class, 'valuation']);
         Route::get('/inventory/low-stock', [InventoryController::class, 'lowStockAlerts']);
+        Route::get('/inventory/reorder-report', [InventoryController::class, 'reorderReport']);
+        Route::get('/inventory/profitability', [InventoryController::class, 'profitabilityReport']);
 
-        // Procurement & Suppliers
+        // Procurement & Vendors
         Route::get('/procurement/suppliers', [ProcurementController::class, 'suppliers']);
         Route::post('/procurement/suppliers', [ProcurementController::class, 'createSupplier']);
+        Route::get('/procurement/suppliers/{id}', [ProcurementController::class, 'showSupplier']);
+        Route::put('/procurement/suppliers/{id}', [ProcurementController::class, 'updateSupplier']);
+        Route::get('/procurement/suppliers/{id}/bank-details', [ProcurementController::class, 'supplierBankDetails']);
+        Route::get('/procurement/purchase-requests', [ProcurementController::class, 'purchaseRequests']);
+        Route::post('/procurement/purchase-requests', [ProcurementController::class, 'createPurchaseRequest']);
+        Route::post('/procurement/purchase-requests/{id}/approve', [ProcurementController::class, 'approvePurchaseRequest']);
+        Route::post('/procurement/purchase-requests/{id}/reject', [ProcurementController::class, 'rejectPurchaseRequest']);
         Route::get('/procurement/purchase-orders', [ProcurementController::class, 'purchaseOrders']);
         Route::post('/procurement/purchase-orders', [ProcurementController::class, 'createPurchaseOrder']);
+        Route::get('/procurement/purchase-orders/{id}', [ProcurementController::class, 'showPurchaseOrder']);
+        Route::post('/procurement/purchase-orders/{id}/approve', [ProcurementController::class, 'approvePurchaseOrder']);
+        Route::post('/procurement/purchase-orders/{id}/revise', [ProcurementController::class, 'revisePurchaseOrder']);
         Route::post('/procurement/purchase-orders/{id}/receive', [ProcurementController::class, 'receiveGoods']);
+        Route::post('/procurement/purchase-orders/{id}/create-bill', [ProcurementController::class, 'createBill']);
+        Route::get('/procurement/goods-receipt-notes', [ProcurementController::class, 'goodsReceiptNotes']);
+
+        // Customer Returns (RMA) & Refunds
+        Route::get('/returns/reports', [CustomerReturnController::class, 'reports']);
+        Route::get('/returns', [CustomerReturnController::class, 'index']);
+        Route::post('/returns', [CustomerReturnController::class, 'store']);
+        Route::get('/returns/{id}', [CustomerReturnController::class, 'show']);
+        Route::post('/returns/{id}/inspect', [CustomerReturnController::class, 'inspect']);
+        Route::post('/returns/{id}/approve', [CustomerReturnController::class, 'approve']);
 
         // Finance & Billing: Quotations
         Route::post('/quotations/{id}/submit-approval', [QuotationController::class, 'submitForApproval']);
@@ -775,6 +915,14 @@ $registerCrmRoutes = function () {
         Route::post('/inbox/identity/pending/{id}/review', [OmnichannelChannelConfigController::class, 'reviewMerge']);
 
         // Visual Workflow Automation Builder
+        Route::get('/workflows/dashboard/metrics', [WorkflowLimitController::class, 'getMetrics']);
+        Route::get('/workflows/triggers/catalog', [WorkflowLimitController::class, 'getTriggersCatalog']);
+        Route::get('/workflows/limits', [WorkflowLimitController::class, 'getLimits']);
+        Route::put('/workflows/limits', [WorkflowLimitController::class, 'updateLimits']);
+        Route::get('/workflows/approvals', [WorkflowApprovalController::class, 'index']);
+        Route::get('/workflows/approvals/{id}', [WorkflowApprovalController::class, 'show']);
+        Route::post('/workflows/approvals/{id}/decide', [WorkflowApprovalController::class, 'decide']);
+
         Route::get('/workflows/templates', [WorkflowController::class, 'templates']);
         Route::post('/workflows/import-template', [WorkflowController::class, 'importTemplate']);
         Route::post('/workflows/{id}/publish', [WorkflowController::class, 'publish']);
@@ -864,7 +1012,50 @@ $registerCrmRoutes = function () {
             Route::get('/saved-reports', [AnalyticsController::class, 'savedReports']);
             Route::post('/saved-reports', [AnalyticsController::class, 'saveReport']);
             Route::delete('/saved-reports/{id}', [AnalyticsController::class, 'deleteSavedReport']);
+
+            // Prompt 49: Advanced Executive Dashboard, BI Widgets & Reports
+            Route::get('/owner-dashboard', [OwnerDashboardController::class, 'getMetrics']);
+            Route::get('/dashboard-layouts', [OwnerDashboardController::class, 'getLayouts']);
+            Route::post('/dashboard-layouts', [OwnerDashboardController::class, 'saveLayout']);
+            Route::put('/dashboard-layouts/{id}', [OwnerDashboardController::class, 'updateLayout']);
+            Route::delete('/dashboard-layouts/{id}', [OwnerDashboardController::class, 'deleteLayout']);
+
+            // Custom Report Builder
+            Route::get('/report-builder/catalog', [CustomReportBuilderController::class, 'getCatalog']);
+            Route::post('/report-builder/preview', [CustomReportBuilderController::class, 'previewReport']);
+            Route::post('/report-builder/save', [CustomReportBuilderController::class, 'saveReport']);
+            Route::post('/report-builder/export', [CustomReportBuilderController::class, 'exportReport']);
+            Route::post('/report-builder/{id}/schedule', [CustomReportBuilderController::class, 'scheduleReport']);
+
+            // Domain Analytics Deep Dives
+            Route::get('/sales-deep-dive', [SalesMarketingFinanceAnalyticsController::class, 'salesDeepDive']);
+            Route::get('/marketing-deep-dive', [SalesMarketingFinanceAnalyticsController::class, 'marketingDeepDive']);
+            Route::get('/finance-deep-dive', [SalesMarketingFinanceAnalyticsController::class, 'financeDeepDive']);
+
+            // AI Insights & Custom Alerts
+            Route::get('/ai-insights', [AiInsightsAlertsController::class, 'getAiInsights']);
+            Route::get('/alerts', [AiInsightsAlertsController::class, 'getAlerts']);
+            Route::post('/alerts', [AiInsightsAlertsController::class, 'createAlert']);
+            Route::put('/alerts/{id}', [AiInsightsAlertsController::class, 'updateAlert']);
+            Route::delete('/alerts/{id}', [AiInsightsAlertsController::class, 'deleteAlert']);
+            Route::post('/alerts/evaluate', [AiInsightsAlertsController::class, 'evaluateAlerts']);
         });
+
+        // Field Sales & Visit Route Management
+        Route::prefix('field-sales')->group(function () {
+            Route::get('/visits', [FieldSalesController::class, 'index']);
+            Route::post('/visits', [FieldSalesController::class, 'store']);
+            Route::post('/visits/{id}/check-in', [FieldSalesController::class, 'checkIn']);
+            Route::post('/visits/{id}/check-out', [FieldSalesController::class, 'checkOut']);
+            Route::get('/daily-plan', [FieldSalesController::class, 'dailyPlan']);
+            Route::get('/analytics', [FieldSalesController::class, 'analytics']);
+            Route::post('/sync-offline', [FieldSalesController::class, 'syncOffline']);
+        });
+
+        // India-First Capabilities & Settings
+        Route::get('/india/settings', [IndiaFirstController::class, 'getSettings']);
+        Route::match(['get', 'post'], '/india/format-inr', [IndiaFirstController::class, 'formatAmount']);
+        Route::get('/india/translations/{lang}', [IndiaFirstController::class, 'getTranslations']);
 
         // Analytics Tracking SDK, GA4 & Attribution Diagnostics
         Route::prefix('tracking')->group(function () {
@@ -1069,6 +1260,32 @@ $registerCrmRoutes = function () {
             Route::get('/usage/reports', [AiAssistantController::class, 'getUsageReports']);
             Route::get('/usage/logs', [AiAssistantController::class, 'getRequestLogs']);
         });
+
+        // Advanced Multi-Branch and Multi-Location Business Management (Prompt 45)
+        Route::prefix('branches')->group(function () {
+            Route::get('/', [BranchController::class, 'index']);
+            Route::post('/', [BranchController::class, 'store']);
+            Route::get('/analytics/consolidated', [BranchController::class, 'consolidated']);
+            Route::post('/transfers', [BranchController::class, 'transfer']);
+            Route::get('/transfers/history', [BranchController::class, 'transferHistory']);
+            Route::get('/{id}', [BranchController::class, 'show']);
+            Route::put('/{id}', [BranchController::class, 'update']);
+            Route::delete('/{id}', [BranchController::class, 'destroy']);
+            Route::patch('/{id}/status', [BranchController::class, 'setStatus']);
+            Route::post('/{id}/employees', [BranchController::class, 'assignEmployees']);
+            Route::get('/{id}/dashboard', [BranchController::class, 'dashboard']);
+            Route::get('/{id}/settings', [BranchController::class, 'getSettings']);
+            Route::put('/{id}/settings', [BranchController::class, 'updateSettings']);
+            Route::match(['get', 'post'], '/{id}/sales-targets', [BranchController::class, 'salesTargets']);
+        });
+
+        // Customer Portal Administration & Bookable Services (Prompt 46)
+        Route::prefix('portal-settings')->group(function () {
+            Route::get('/', [PortalSettingController::class, 'show']);
+            Route::put('/', [PortalSettingController::class, 'update']);
+        });
+        Route::post('/customers/{customer}/invite-portal', [PortalSettingController::class, 'inviteCustomer']);
+        Route::apiResource('/bookable-services', BookableServiceController::class);
     });
 
     // --------------------------------------------------------------------
@@ -1110,6 +1327,47 @@ $registerCrmRoutes = function () {
         Route::post('/system/maintenance', [PlatformSystemController::class, 'setMaintenanceMode'])->middleware('platform.admin:ops');
         Route::get('/system/audit-logs', [PlatformSystemController::class, 'auditLogs']);
     });
+
+    // --------------------------------------------------------------------
+    // PROMPT 50: Enterprise Multi-Tenant SaaS, Onboarding & Industry Templates
+    // --------------------------------------------------------------------
+    // Public Onboarding & Catalog
+    Route::post('/saas/onboarding/register', [SaasOnboardingController::class, 'register']);
+    Route::get('/saas/templates/catalog', [IndustryTemplateController::class, 'index']);
+
+    // Tenant-Scoped SaaS Operations
+    Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
+        Route::get('/templates', [IndustryTemplateController::class, 'index']);
+        Route::get('/templates/current', [IndustryTemplateController::class, 'current']);
+        Route::get('/templates/{code}', [IndustryTemplateController::class, 'show']);
+        Route::post('/templates/apply', [IndustryTemplateController::class, 'apply']);
+
+        Route::post('/onboarding/step', [SaasOnboardingController::class, 'saveStep']);
+        Route::get('/onboarding/status', [SaasOnboardingController::class, 'status']);
+
+        Route::get('/entitlements', [FeatureEntitlementController::class, 'index']);
+        Route::post('/entitlements/verify', [FeatureEntitlementController::class, 'verify']);
+    });
+
+    // Platform Super Admin Console (Enterprise SaaS Management)
+    Route::middleware(['auth:sanctum', 'platform.admin'])->prefix('platform/console')->group(function () {
+        Route::get('/overview', [PlatformSuperAdminConsoleController::class, 'overview']);
+        Route::get('/tenants', [PlatformSuperAdminConsoleController::class, 'tenants']);
+        Route::post('/tenants/{id}/suspend', [PlatformSuperAdminConsoleController::class, 'suspendTenant']);
+        Route::post('/tenants/{id}/reactivate', [PlatformSuperAdminConsoleController::class, 'reactivateTenant']);
+        Route::post('/tenants/{id}/change-plan', [PlatformSuperAdminConsoleController::class, 'changeTenantPlan']);
+        Route::get('/plans', [PlatformSuperAdminConsoleController::class, 'plans']);
+        Route::post('/plans', [PlatformSuperAdminConsoleController::class, 'savePlan']);
+        Route::get('/revenue', [PlatformSuperAdminConsoleController::class, 'revenueReport']);
+        Route::get('/announcements', [PlatformSuperAdminConsoleController::class, 'announcements']);
+        Route::post('/announcements', [PlatformSuperAdminConsoleController::class, 'createAnnouncement']);
+        Route::get('/backups', [PlatformSuperAdminConsoleController::class, 'backups']);
+        Route::post('/backups', [PlatformSuperAdminConsoleController::class, 'triggerBackup']);
+        Route::get('/audit-logs', [PlatformSuperAdminConsoleController::class, 'auditLogs']);
+    });
+
+    // Public / Tenant broadcast announcements
+    Route::middleware('auth:sanctum')->get('/platform/announcements', [PlatformSuperAdminConsoleController::class, 'announcements']);
 };
 
 // Register under /api/v1/... (Standard Versioned Path)

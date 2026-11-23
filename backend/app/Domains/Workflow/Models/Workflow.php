@@ -24,6 +24,9 @@ class Workflow extends Model
         'category',
         'status', // draft, published, paused
         'trigger_type',
+        'execution_mode',
+        'timezone',
+        'working_hours_only',
         'current_version',
         'is_active',
         'total_runs_count',
@@ -33,6 +36,7 @@ class Workflow extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'working_hours_only' => 'boolean',
         'current_version' => 'integer',
         'total_runs_count' => 'integer',
         'last_run_at' => 'datetime',
@@ -51,6 +55,11 @@ class Workflow extends Model
     public function runs(): HasMany
     {
         return $this->hasMany(WorkflowRun::class, 'workflow_id')->orderBy('id', 'desc');
+    }
+
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(WorkflowApproval::class, 'workflow_id')->orderBy('id', 'desc');
     }
 
     public function creator(): BelongsTo

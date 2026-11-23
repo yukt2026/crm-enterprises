@@ -90,11 +90,16 @@ class ProductCatalogController extends Controller
             'category' => 'nullable|string|max:100',
             'brand' => 'nullable|string|max:100',
             'unit' => 'nullable|string|max:50',
+            'secondary_unit' => 'nullable|string|max:50',
+            'unit_conversion_factor' => 'nullable|numeric|min:0.0001',
             'price' => 'required|numeric|min:0',
+            'min_selling_price' => 'nullable|numeric|min:0',
             'cost_price' => 'nullable|numeric|min:0',
             'tax_rate' => 'nullable|numeric|min:0|max:100',
             'hsn_sac_code' => 'nullable|string|max:50',
             'barcode' => 'nullable|string|max:100',
+            'reorder_level' => 'nullable|numeric|min:0',
+            'reorder_quantity' => 'nullable|numeric|min:0',
             'track_inventory' => 'nullable|boolean',
             'allow_negative_stock' => 'nullable|boolean',
             'service_duration' => 'nullable|string|max:100',
@@ -117,13 +122,19 @@ class ProductCatalogController extends Controller
             'category' => $validated['category'] ?? 'General',
             'brand' => $validated['brand'] ?? null,
             'unit' => $validated['unit'] ?? ($type === 'service' ? 'hrs' : 'pcs'),
+            'secondary_unit' => $validated['secondary_unit'] ?? null,
+            'unit_conversion_factor' => $validated['unit_conversion_factor'] ?? 1.0000,
             'price' => $validated['price'],
+            'min_selling_price' => $validated['min_selling_price'] ?? null,
             'cost_price' => $validated['cost_price'] ?? 0,
             'tax_rate' => $validated['tax_rate'] ?? 0,
             'hsn_sac_code' => $validated['hsn_sac_code'] ?? null,
             'barcode' => $validated['barcode'] ?? null,
+            'reorder_level' => $validated['reorder_level'] ?? 10.00,
+            'reorder_quantity' => $validated['reorder_quantity'] ?? 50.00,
             'track_inventory' => $type === 'service' ? false : ($validated['track_inventory'] ?? true),
             'allow_negative_stock' => $validated['allow_negative_stock'] ?? false,
+            'is_archived' => false,
             'service_duration' => $validated['service_duration'] ?? null,
             'service_delivery_type' => $validated['service_delivery_type'] ?? null,
             'status' => $validated['status'] ?? 'active',
@@ -278,5 +289,144 @@ class ProductCatalogController extends Controller
         ]);
 
         return $this->successResponse($variant, 'Variant created.', 201);
+    }
+
+    /**
+     * Archive product.
+     */
+    public function archive(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $product = Product::where('tenant_id', $tenantId)->findOrFail($id);
+        $product->is_archived = true;
+        $product->save();
+
+        return $this->successResponse($product, 'Product archived successfully.');
+    }
+
+    /**
+     * Unarchive product.
+     */
+    public function unarchive(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $product = Product::where('tenant_id', $tenantId)->findOrFail($id);
+        $product->is_archived = false;
+        $product->save();
+
+        return $this->successResponse($product, 'Product unarchived successfully.');
+    }
+
+    /**
+     * Check real-time stock availability for quotation / order line items.
+     */
+    public function checkAvailability(Request $request): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_variant_id' => 'nullable',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.warehouse_id' => 'nullable|exists:warehouses,id',
+            'preferred_warehouse_id' => 'nullable|exists:warehouses,id',
+        ]);
+
+        $res = $this->inventoryService->checkStockAvailability(
+            $tenantId,
+            $validated['items'],
+            $validated['preferred_warehouse_id'] ?? null
+        );
+
+        return $this->successResponse($res, 'Stock availability computed successfully.');
+    }
+
+    /**
+     * Export products to CSV format.
+     */
+    public function exportCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $tenantId = $this->getTenantId();
+        $products = Product::where('tenant_id', $tenantId)->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="products_export_' . date('Y-m-d') . '.csv"',
+        ];
+
+        return response()->stream(function () use ($products) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['ID', 'Name', 'Type', 'SKU', 'Barcode', 'Category', 'Brand', 'Unit', 'Price', 'Min Selling Price', 'Cost Price', 'Tax Rate', 'HSN/SAC', 'Track Inventory', 'Reorder Level', 'Reorder Quantity', 'Status']);
+
+            foreach ($products as $p) {
+                fputcsv($handle, [
+                    $p->id,
+                    $p->name,
+                    $p->type,
+                    $p->sku,
+                    $p->barcode,
+                    $p->category,
+                    $p->brand,
+                    $p->unit,
+                    $p->price,
+                    $p->min_selling_price,
+                    $p->cost_price,
+                    $p->tax_rate,
+                    $p->hsn_sac_code,
+                    $p->track_inventory ? 'Yes' : 'No',
+                    $p->reorder_level,
+                    $p->reorder_quantity,
+                    $p->status,
+                ]);
+            }
+            fclose($handle);
+        }, 200, $headers);
+    }
+
+    /**
+     * Import products from CSV data.
+     */
+    public function importCsv(Request $request): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $validated = $request->validate([
+            'products' => 'required|array|min:1',
+            'products.*.name' => 'required|string|max:255',
+            'products.*.price' => 'required|numeric|min:0',
+            'products.*.sku' => 'nullable|string',
+            'products.*.cost_price' => 'nullable|numeric',
+            'products.*.type' => 'nullable|in:product,service',
+        ]);
+
+        $imported = [];
+        foreach ($validated['products'] as $row) {
+            $sku = !empty($row['sku']) ? $row['sku'] : ('SKU-' . strtoupper(Str::random(8)));
+            $product = Product::updateOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'sku' => $sku,
+                ],
+                [
+                    'name' => $row['name'],
+                    'type' => $row['type'] ?? 'product',
+                    'category' => $row['category'] ?? 'General',
+                    'brand' => $row['brand'] ?? null,
+                    'unit' => $row['unit'] ?? 'pcs',
+                    'price' => $row['price'],
+                    'cost_price' => $row['cost_price'] ?? 0,
+                    'tax_rate' => $row['tax_rate'] ?? 0,
+                    'hsn_sac_code' => $row['hsn_sac_code'] ?? null,
+                    'barcode' => $row['barcode'] ?? null,
+                    'track_inventory' => ($row['type'] ?? 'product') !== 'service',
+                    'status' => 'active',
+                ]
+            );
+            $imported[] = $product;
+        }
+
+        return $this->successResponse([
+            'imported_count' => count($imported),
+            'products' => $imported,
+        ], 'Products imported successfully.');
     }
 }

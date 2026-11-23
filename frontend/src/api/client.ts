@@ -102,6 +102,31 @@ import {
   WorkflowTemplateItem,
   WorkflowSimulationResult,
   WorkflowDefinition,
+  WorkflowApprovalItem,
+  WorkflowAutomationLimitItem,
+  WorkflowMetricsItem,
+  OwnerDashboardMetrics,
+  DashboardWidgetLayoutItem,
+  CustomReportModuleCatalog,
+  CustomReportPreviewResult,
+  CustomAnalyticsAlertItem,
+  FieldSalesVisitItem,
+  FieldSalesDailyPlan,
+  FieldSalesAnalytics,
+  AiBusinessInsightsItem,
+  IndiaSettingsItem,
+  IndustryTemplateItem,
+  TenantAppliedTemplateItem,
+  FeatureEntitlementCatalog,
+  FeatureEntitlementVerification,
+  PlatformConsoleOverview,
+  PlatformTenantItem,
+  PlatformPlanItem,
+  PlatformAnnouncementItem,
+  PlatformBackupRecordItem,
+  PlatformRevenueReport,
+  SaasOnboardingRegisterPayload,
+  SaasOnboardingStepPayload,
   CustomDomainItem,
   LandingPageItem,
   LandingPageRevisionItem,
@@ -224,6 +249,18 @@ import {
   KnowledgeCategoryItem,
   KnowledgeArticleItem,
   AiAnswerSuggestion,
+  BranchItem,
+  BranchTransferItem,
+  BranchSalesTargetItem,
+  BranchDashboardMetrics,
+  ConsolidatedBranchAnalytics,
+  CustomerAccountItem,
+  CustomerLoginHistoryItem,
+  PortalSettingItem,
+  BookableServiceItem,
+  CustomerDashboardData,
+  PublicBookingConfig,
+  PublicBookingSlot,
 } from './types';
 
 const memoryStore: Record<string, string> = {};
@@ -1337,6 +1374,270 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ items }),
     });
+  }
+
+  // --- Advanced Inventory & Procurement Enhancements ---
+
+  async archiveProduct(id: number): Promise<ApiResponse<ProductCatalogItem>> {
+    return this.request(`/crm/catalog/${id}/archive`, { method: 'POST' });
+  }
+
+  async unarchiveProduct(id: number): Promise<ApiResponse<ProductCatalogItem>> {
+    return this.request(`/crm/catalog/${id}/unarchive`, { method: 'POST' });
+  }
+
+  async checkProductAvailability(items: Array<{ product_id: number; quantity: number; warehouse_id?: number }>, preferredWarehouseId?: number): Promise<ApiResponse<any>> {
+    return this.request('/crm/catalog/check-availability', {
+      method: 'POST',
+      body: JSON.stringify({ items, preferred_warehouse_id: preferredWarehouseId }),
+    });
+  }
+
+  async importProductsCsv(products: any[]): Promise<ApiResponse<any>> {
+    return this.request('/crm/catalog/import', {
+      method: 'POST',
+      body: JSON.stringify({ products }),
+    });
+  }
+
+  async getInventorySettings(): Promise<ApiResponse<InventorySettingItem>> {
+    return this.request('/crm/inventory/settings');
+  }
+
+  async updateInventorySettings(data: Partial<InventorySettingItem>): Promise<ApiResponse<InventorySettingItem>> {
+    return this.request('/crm/inventory/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getWarehouse(id: number): Promise<ApiResponse<WarehouseItem>> {
+    return this.request(`/crm/inventory/warehouses/${id}`);
+  }
+
+  async updateWarehouse(id: number, data: Partial<WarehouseItem>): Promise<ApiResponse<WarehouseItem>> {
+    return this.request(`/crm/inventory/warehouses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getTransfers(params: { status?: string; page?: number; per_page?: number } = {}): Promise<ApiResponse<StockTransferRecord[]>> {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, String(v));
+    });
+    return this.request(`/crm/inventory/transfers${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
+  async createTransferRequest(data: {
+    source_warehouse_id: number;
+    destination_warehouse_id: number;
+    items: Array<{ product_id: number; product_variant_id?: number; quantity: number; notes?: string }>;
+    notes?: string;
+  }): Promise<ApiResponse<StockTransferRecord>> {
+    return this.request('/crm/inventory/transfers/request', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async approveTransfer(id: number): Promise<ApiResponse<StockTransferRecord>> {
+    return this.request(`/crm/inventory/transfers/${id}/approve`, { method: 'POST' });
+  }
+
+  async dispatchTransfer(id: number): Promise<ApiResponse<StockTransferRecord>> {
+    return this.request(`/crm/inventory/transfers/${id}/dispatch`, { method: 'POST' });
+  }
+
+  async receiveTransfer(id: number, data: {
+    items: Array<{ item_id: number; accepted_quantity: number; damaged_quantity?: number }>;
+    damage_notes?: string;
+  }): Promise<ApiResponse<StockTransferRecord>> {
+    return this.request(`/crm/inventory/transfers/${id}/receive`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async reserveStock(data: { product_id: number; warehouse_id: number; quantity: number; reference_type?: string; reference_id?: number }): Promise<ApiResponse<any>> {
+    return this.request('/crm/inventory/reserve', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async releaseStock(data: { product_id: number; warehouse_id: number; quantity: number; reference_type?: string; reference_id?: number }): Promise<ApiResponse<any>> {
+    return this.request('/crm/inventory/release', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async issueStock(data: { product_id: number; warehouse_id: number; quantity: number; reason: string }): Promise<ApiResponse<any>> {
+    return this.request('/crm/inventory/issue', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getReconciliations(): Promise<ApiResponse<StockReconciliationRecord[]>> {
+    return this.request('/crm/inventory/reconciliations');
+  }
+
+  async createReconciliation(data: {
+    warehouse_id: number;
+    items: Array<{ product_id: number; physical_quantity: number; reconciliation_action?: string }>;
+    notes?: string;
+  }): Promise<ApiResponse<StockReconciliationRecord>> {
+    return this.request('/crm/inventory/reconciliations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async applyReconciliation(id: number): Promise<ApiResponse<StockReconciliationRecord>> {
+    return this.request(`/crm/inventory/reconciliations/${id}/apply`, { method: 'POST' });
+  }
+
+  async getReorderReport(warehouseId?: number): Promise<ApiResponse<any>> {
+    const q = warehouseId ? `?warehouse_id=${warehouseId}` : '';
+    return this.request(`/crm/inventory/reorder-report${q}`);
+  }
+
+  async getProductProfitabilityReport(): Promise<ApiResponse<any>> {
+    return this.request('/crm/inventory/profitability');
+  }
+
+  async getSupplier(id: number): Promise<ApiResponse<SupplierItem>> {
+    return this.request(`/crm/procurement/suppliers/${id}`);
+  }
+
+  async updateSupplier(id: number, data: Partial<SupplierItem>): Promise<ApiResponse<SupplierItem>> {
+    return this.request(`/crm/procurement/suppliers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getSupplierBankDetails(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/crm/procurement/suppliers/${id}/bank-details`);
+  }
+
+  async getPurchaseRequests(params: { status?: string; page?: number; per_page?: number } = {}): Promise<ApiResponse<PurchaseRequestRecord[]>> {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, String(v));
+    });
+    return this.request(`/crm/procurement/purchase-requests${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
+  async createPurchaseRequest(data: {
+    warehouse_id: number;
+    items: Array<{ product_id: number; quantity: number; estimated_unit_cost?: number; notes?: string }>;
+    department_id?: number;
+    notes?: string;
+  }): Promise<ApiResponse<PurchaseRequestRecord>> {
+    return this.request('/crm/procurement/purchase-requests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async approvePurchaseRequest(id: number): Promise<ApiResponse<PurchaseRequestRecord>> {
+    return this.request(`/crm/procurement/purchase-requests/${id}/approve`, { method: 'POST' });
+  }
+
+  async rejectPurchaseRequest(id: number, reason: string): Promise<ApiResponse<PurchaseRequestRecord>> {
+    return this.request(`/crm/procurement/purchase-requests/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejection_reason: reason }),
+    });
+  }
+
+  async getPurchaseOrder(id: number): Promise<ApiResponse<PurchaseOrderRecord>> {
+    return this.request(`/crm/procurement/purchase-orders/${id}`);
+  }
+
+  async approvePurchaseOrder(id: number): Promise<ApiResponse<PurchaseOrderRecord>> {
+    return this.request(`/crm/procurement/purchase-orders/${id}/approve`, { method: 'POST' });
+  }
+
+  async revisePurchaseOrder(id: number, data: any): Promise<ApiResponse<PurchaseOrderRecord>> {
+    return this.request(`/crm/procurement/purchase-orders/${id}/revise`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async receivePurchaseOrderWithQC(id: number, data: {
+    received_date?: string;
+    challan_number?: string;
+    invoice_reference?: string;
+    qc_notes?: string;
+    items: Array<{ item_id: number; quantity: number; accepted_quantity?: number; rejected_damaged_quantity?: number; rejection_reason?: string }>;
+  }): Promise<ApiResponse<GoodsReceiptNoteRecord>> {
+    return this.request(`/crm/procurement/purchase-orders/${id}/receive`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createBillFromPO(id: number, data: { bill_number?: string; bill_date?: string; due_date?: string; notes?: string } = {}): Promise<ApiResponse<any>> {
+    return this.request(`/crm/procurement/purchase-orders/${id}/create-bill`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getGoodsReceiptNotes(): Promise<ApiResponse<GoodsReceiptNoteRecord[]>> {
+    return this.request('/crm/procurement/goods-receipt-notes');
+  }
+
+  // --- Customer Returns (RMA) ---
+
+  async getCustomerReturns(params: { status?: string; customer_id?: number; page?: number; per_page?: number } = {}): Promise<ApiResponse<CustomerReturnRecord[]>> {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, String(v));
+    });
+    return this.request(`/crm/returns${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
+  async createCustomerReturn(data: {
+    customer_id: number;
+    return_reason: string;
+    invoice_id?: number;
+    order_reference?: string;
+    warehouse_id?: number;
+    product_condition?: string;
+    restock_action?: string;
+    refund_type?: string;
+    items: Array<{ product_id: number; quantity: number; unit_price?: number; tax_rate?: number; condition_notes?: string }>;
+  }): Promise<ApiResponse<CustomerReturnRecord>> {
+    return this.request('/crm/returns', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getCustomerReturn(id: number): Promise<ApiResponse<CustomerReturnRecord>> {
+    return this.request(`/crm/returns/${id}`);
+  }
+
+  async inspectCustomerReturn(id: number, data: { product_condition: string; restock_action: string; inspection_notes?: string }): Promise<ApiResponse<CustomerReturnRecord>> {
+    return this.request(`/crm/returns/${id}/inspect`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async approveCustomerReturn(id: number): Promise<ApiResponse<CustomerReturnRecord>> {
+    return this.request(`/crm/returns/${id}/approve`, { method: 'POST' });
+  }
+
+  async getCustomerReturnsReport(): Promise<ApiResponse<any>> {
+    return this.request('/crm/returns/reports');
   }
 
   // --------------------------------------------------------------------------
@@ -3313,7 +3614,7 @@ class ApiClient {
     entityId?: number,
     payload?: Record<string, any>
   ): Promise<ApiResponse<WorkflowRunItem>> {
-    return this.request('/crm/workflow-runs/manual-trigger', {
+    return this.request('/crm/workflows/trigger', {
       method: 'POST',
       body: JSON.stringify({
         workflow_id: workflowId,
@@ -3322,6 +3623,62 @@ class ApiClient {
         payload: payload ?? {},
       }),
     });
+  }
+
+  async getWorkflowApprovals(params?: {
+    status?: string;
+    category?: string;
+    approver_role?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<ApiResponse<WorkflowApprovalItem[]>> {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.append('status', params.status);
+    if (params?.category) qs.append('category', params.category);
+    if (params?.approver_role) qs.append('approver_role', params.approver_role);
+    if (params?.page) qs.append('page', String(params.page));
+    if (params?.per_page) qs.append('per_page', String(params.per_page));
+    const queryStr = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/workflows/approvals${queryStr}`);
+  }
+
+  async getWorkflowApproval(id: number): Promise<ApiResponse<WorkflowApprovalItem>> {
+    return this.request(`/crm/workflows/approvals/${id}`);
+  }
+
+  async decideWorkflowApproval(
+    id: number,
+    data: { decision: 'approve' | 'reject'; comments?: string }
+  ): Promise<ApiResponse<{ approval: WorkflowApprovalItem; run: WorkflowRunItem }>> {
+    return this.request(`/crm/workflows/approvals/${id}/decide`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getWorkflowLimits(): Promise<ApiResponse<{
+    limits: WorkflowAutomationLimitItem;
+    active_workflows_count: number;
+    monthly_usage_percentage: number;
+  }>> {
+    return this.request('/crm/workflows/limits');
+  }
+
+  async updateWorkflowLimits(
+    data: Partial<WorkflowAutomationLimitItem>
+  ): Promise<ApiResponse<WorkflowAutomationLimitItem>> {
+    return this.request('/crm/workflows/limits', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getWorkflowMetrics(): Promise<ApiResponse<WorkflowMetricsItem>> {
+    return this.request('/crm/workflows/dashboard/metrics');
+  }
+
+  async getWorkflowTriggersCatalog(): Promise<ApiResponse<Record<string, any>>> {
+    return this.request('/crm/workflows/triggers/catalog');
   }
 
   // ----------------------------------------------------
@@ -4272,6 +4629,144 @@ class ApiClient {
     return this.request('/crm/projects/metrics');
   }
 
+  async createProjectFromDeal(dealId: number, overrides: any = {}): Promise<ApiResponse<ProjectItem>> {
+    return this.request('/crm/projects/create-from-deal', {
+      method: 'POST',
+      body: JSON.stringify({ deal_id: dealId, ...overrides }),
+    });
+  }
+
+  async createProjectFromQuotation(quotationId: number, overrides: any = {}): Promise<ApiResponse<ProjectItem>> {
+    return this.request('/crm/projects/create-from-quotation', {
+      method: 'POST',
+      body: JSON.stringify({ quotation_id: quotationId, ...overrides }),
+    });
+  }
+
+  async transitionProjectStatus(projectId: number, status: string, reason?: string): Promise<ApiResponse<ProjectItem>> {
+    return this.request(`/crm/projects/${projectId}/transition-status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, reason }),
+    });
+  }
+
+  async getProjectFinancials(projectId: number): Promise<ApiResponse<ProjectFinancialMetrics>> {
+    return this.request(`/crm/projects/${projectId}/financials`);
+  }
+
+  async getProjectGantt(projectId: number): Promise<ApiResponse<GanttChartData>> {
+    return this.request(`/crm/projects/${projectId}/gantt`);
+  }
+
+  async getProjectWorkload(branchId?: number): Promise<ApiResponse<TeamWorkloadItem[]>> {
+    const q = branchId ? `?branch_id=${branchId}` : '';
+    return this.request(`/crm/projects/workload${q}`);
+  }
+
+  async getProjectDocuments(projectId: number, clientOnly: boolean = false): Promise<ApiResponse<ProjectDocumentItem[]>> {
+    const q = clientOnly ? '?client_only=true' : '';
+    return this.request(`/crm/projects/${projectId}/documents${q}`);
+  }
+
+  async uploadProjectDocument(projectId: number, data: Partial<ProjectDocumentItem>): Promise<ApiResponse<ProjectDocumentItem>> {
+    return this.request(`/crm/projects/${projectId}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async toggleProjectDocumentVisibility(documentId: number, isClientVisible: boolean): Promise<ApiResponse<ProjectDocumentItem>> {
+    return this.request(`/crm/project-documents/${documentId}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_client_visible: isClientVisible }),
+    });
+  }
+
+  async deleteProjectDocument(documentId: number): Promise<ApiResponse<null>> {
+    return this.request(`/crm/project-documents/${documentId}`, { method: 'DELETE' });
+  }
+
+  async submitMilestoneForReview(milestoneId: number, summary?: string): Promise<ApiResponse<ProjectMilestoneItem>> {
+    return this.request(`/crm/milestones/${milestoneId}/submit-review`, {
+      method: 'POST',
+      body: JSON.stringify({ deliverables_summary: summary }),
+    });
+  }
+
+  async approveMilestoneInternal(milestoneId: number, notes?: string): Promise<ApiResponse<ProjectMilestoneItem>> {
+    return this.request(`/crm/milestones/${milestoneId}/approve-internal`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  }
+
+  async sendMilestoneToClient(milestoneId: number, notes?: string): Promise<ApiResponse<ProjectMilestoneItem>> {
+    return this.request(`/crm/milestones/${milestoneId}/send-to-client`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  }
+
+  async getPortalMilestone(token: string): Promise<ApiResponse<ProjectMilestoneItem>> {
+    return this.request(`/portal/milestones/${token}`);
+  }
+
+  async clientApproveMilestone(token: string, clientName: string, feedback?: string): Promise<ApiResponse<ProjectMilestoneItem>> {
+    return this.request(`/portal/milestones/${token}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ client_name: clientName, feedback }),
+    });
+  }
+
+  async clientRevisionMilestone(token: string, clientName: string, feedback: string): Promise<ApiResponse<ProjectMilestoneItem>> {
+    return this.request(`/portal/milestones/${token}/revision`, {
+      method: 'POST',
+      body: JSON.stringify({ client_name: clientName, feedback }),
+    });
+  }
+
+  // --- ENHANCED TASK TIME LOGS & LIVE TIMER ---
+  async startTaskTimer(taskId: number): Promise<ApiResponse<TaskTimeLogItem>> {
+    return this.request(`/crm/tasks/${taskId}/start-timer`, {
+      method: 'POST',
+    });
+  }
+
+  async stopTaskTimer(logId: number, description?: string): Promise<ApiResponse<TaskTimeLogItem>> {
+    return this.request(`/crm/tasks/stop-timer/${logId}`, {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    });
+  }
+
+  async approveTimeLog(logId: number): Promise<ApiResponse<TaskTimeLogItem>> {
+    return this.request(`/crm/tasks/timesheets/${logId}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  async rejectTimeLog(logId: number, reason: string): Promise<ApiResponse<TaskTimeLogItem>> {
+    return this.request(`/crm/tasks/timesheets/${logId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async getTimesheets(params: {
+    user_id?: number;
+    project_id?: number;
+    status?: string;
+    is_running?: boolean;
+    page?: number;
+    per_page?: number;
+  } = {}): Promise<ApiResponse<TaskTimeLogItem[]>> {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, String(v));
+    });
+    return this.request(`/crm/tasks/timesheets${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
   // --- ENHANCED TASK TIME LOGS & DEPENDENCIES ---
   async logTaskTime(taskId: number, data: { duration_minutes?: number; start_time?: string; end_time?: string; description?: string; is_billable?: boolean }): Promise<ApiResponse<TaskTimeLogItem>> {
     return this.request(`/crm/tasks/${taskId}/log-time`, {
@@ -4714,6 +5209,318 @@ class ApiClient {
 
   async deleteSavedReport(id: number): Promise<ApiResponse<null>> {
     return this.request(`/crm/analytics/saved-reports/${id}`, { method: 'DELETE' });
+  }
+
+  // ----------------------------------------------------
+  // Prompt 49: Advanced BI Dashboard, Report Builder & Field Sales
+  // ----------------------------------------------------
+
+  async getOwnerDashboardMetrics(params?: {
+    from_date?: string;
+    to_date?: string;
+    branch_id?: number;
+    employee_id?: number;
+    department_id?: number;
+  }): Promise<ApiResponse<OwnerDashboardMetrics>> {
+    const qs = new URLSearchParams();
+    if (params?.from_date) qs.append('from_date', params.from_date);
+    if (params?.to_date) qs.append('to_date', params.to_date);
+    if (params?.branch_id) qs.append('branch_id', String(params.branch_id));
+    if (params?.employee_id) qs.append('employee_id', String(params.employee_id));
+    if (params?.department_id) qs.append('department_id', String(params.department_id));
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/analytics/owner-dashboard${query}`);
+  }
+
+  async getDashboardLayouts(): Promise<ApiResponse<DashboardWidgetLayoutItem[]>> {
+    return this.request('/crm/analytics/dashboard-layouts');
+  }
+
+  async saveDashboardLayout(data: {
+    name: string;
+    role?: string;
+    is_default?: boolean;
+    widgets: any[];
+    filters?: Record<string, any>;
+  }): Promise<ApiResponse<DashboardWidgetLayoutItem>> {
+    return this.request('/crm/analytics/dashboard-layouts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateDashboardLayout(
+    id: number,
+    data: Partial<DashboardWidgetLayoutItem>
+  ): Promise<ApiResponse<DashboardWidgetLayoutItem>> {
+    return this.request(`/crm/analytics/dashboard-layouts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteDashboardLayout(id: number): Promise<ApiResponse<void>> {
+    return this.request(`/crm/analytics/dashboard-layouts/${id}`, { method: 'DELETE' });
+  }
+
+  async getCustomReportCatalog(): Promise<ApiResponse<CustomReportModuleCatalog>> {
+    return this.request('/crm/analytics/report-builder/catalog');
+  }
+
+  async previewCustomReport(config: {
+    module: string;
+    from_date?: string;
+    to_date?: string;
+    filters?: any[];
+    selected_columns?: string[];
+    aggregations?: Record<string, any>;
+    group_by?: string;
+    sort_by?: string;
+    sort_direction?: 'asc' | 'desc';
+    chart_type?: string;
+    relations?: string[];
+    limit?: number;
+  }): Promise<ApiResponse<CustomReportPreviewResult>> {
+    return this.request('/crm/analytics/report-builder/preview', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async saveCustomReport(data: {
+    title: string;
+    description?: string;
+    module: string;
+    report_type?: string;
+    group_by?: string;
+    sort_by?: string;
+    sort_direction?: 'asc' | 'desc';
+    chart_type?: string;
+    filters?: any[];
+    selected_columns?: string[];
+    aggregations?: Record<string, any>;
+    is_scheduled?: boolean;
+    schedule_frequency?: 'daily' | 'weekly' | 'monthly';
+    schedule_recipients?: string[];
+  }): Promise<ApiResponse<any>> {
+    return this.request('/crm/analytics/report-builder/save', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async scheduleCustomReport(
+    id: number,
+    data: {
+      is_scheduled: boolean;
+      schedule_frequency?: 'daily' | 'weekly' | 'monthly';
+      schedule_recipients?: string[];
+    }
+  ): Promise<ApiResponse<any>> {
+    return this.request(`/crm/analytics/report-builder/${id}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getSalesDeepDive(params?: { from_date?: string; to_date?: string }): Promise<ApiResponse<any>> {
+    const qs = new URLSearchParams();
+    if (params?.from_date) qs.append('from_date', params.from_date);
+    if (params?.to_date) qs.append('to_date', params.to_date);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/analytics/sales-deep-dive${query}`);
+  }
+
+  async getMarketingDeepDive(params?: { from_date?: string; to_date?: string }): Promise<ApiResponse<any>> {
+    const qs = new URLSearchParams();
+    if (params?.from_date) qs.append('from_date', params.from_date);
+    if (params?.to_date) qs.append('to_date', params.to_date);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/analytics/marketing-deep-dive${query}`);
+  }
+
+  async getFinanceDeepDive(params?: { from_date?: string; to_date?: string }): Promise<ApiResponse<any>> {
+    const qs = new URLSearchParams();
+    if (params?.from_date) qs.append('from_date', params.from_date);
+    if (params?.to_date) qs.append('to_date', params.to_date);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/analytics/finance-deep-dive${query}`);
+  }
+
+  async getAiBusinessInsights(params?: { from_date?: string; to_date?: string }): Promise<ApiResponse<{
+    total_insights: number;
+    generated_at: string;
+    generated_at_ist: string;
+    insights: AiBusinessInsightsItem[];
+  }>> {
+    const qs = new URLSearchParams();
+    if (params?.from_date) qs.append('from_date', params.from_date);
+    if (params?.to_date) qs.append('to_date', params.to_date);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/analytics/ai-insights${query}`);
+  }
+
+  async getCustomAnalyticsAlerts(): Promise<ApiResponse<CustomAnalyticsAlertItem[]>> {
+    return this.request('/crm/analytics/alerts');
+  }
+
+  async createCustomAnalyticsAlert(data: {
+    name: string;
+    metric_type: string;
+    condition_operator: string;
+    threshold_value: number;
+    notification_channels: string[];
+    branch_id?: number;
+    is_active?: boolean;
+  }): Promise<ApiResponse<CustomAnalyticsAlertItem>> {
+    return this.request('/crm/analytics/alerts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCustomAnalyticsAlert(
+    id: number,
+    data: Partial<CustomAnalyticsAlertItem>
+  ): Promise<ApiResponse<CustomAnalyticsAlertItem>> {
+    return this.request(`/crm/analytics/alerts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCustomAnalyticsAlert(id: number): Promise<ApiResponse<void>> {
+    return this.request(`/crm/analytics/alerts/${id}`, { method: 'DELETE' });
+  }
+
+  async evaluateCustomAnalyticsAlerts(): Promise<ApiResponse<{
+    total_alerts_checked: number;
+    triggered_count: number;
+    triggered_alerts: any[];
+  }>> {
+    return this.request('/crm/analytics/alerts/evaluate', { method: 'POST' });
+  }
+
+  async getFieldSalesVisits(params?: {
+    employee_id?: number;
+    branch_id?: number;
+    status?: string;
+    date?: string;
+    page?: number;
+  }): Promise<ApiResponse<FieldSalesVisitItem[]>> {
+    const qs = new URLSearchParams();
+    if (params?.employee_id) qs.append('employee_id', String(params.employee_id));
+    if (params?.branch_id) qs.append('branch_id', String(params.branch_id));
+    if (params?.status) qs.append('status', params.status);
+    if (params?.date) qs.append('date', params.date);
+    if (params?.page) qs.append('page', String(params.page));
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/field-sales/visits${query}`);
+  }
+
+  async scheduleFieldSalesVisit(data: {
+    employee_id: number;
+    customer_id?: number;
+    lead_id?: number;
+    branch_id?: number;
+    title: string;
+    scheduled_at: string;
+    route_waypoints?: any[];
+    offline_client_uuid?: string;
+  }): Promise<ApiResponse<FieldSalesVisitItem>> {
+    return this.request('/crm/field-sales/visits', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkInFieldSalesVisit(
+    id: number,
+    data: { latitude: number; longitude: number; address?: string }
+  ): Promise<ApiResponse<FieldSalesVisitItem>> {
+    return this.request(`/crm/field-sales/visits/${id}/check-in`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkOutFieldSalesVisit(
+    id: number,
+    data: {
+      check_out_lat?: number;
+      check_out_lng?: number;
+      check_out_address?: string;
+      distance_travelled_km?: number;
+      visit_notes: string;
+      outcome: string;
+      follow_up_date?: string;
+      travel_expense_amount?: number;
+    }
+  ): Promise<ApiResponse<FieldSalesVisitItem>> {
+    return this.request(`/crm/field-sales/visits/${id}/check-out`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getFieldSalesDailyPlan(employeeId?: number, date?: string): Promise<ApiResponse<FieldSalesDailyPlan>> {
+    const qs = new URLSearchParams();
+    if (employeeId) qs.append('employee_id', String(employeeId));
+    if (date) qs.append('date', date);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/field-sales/daily-plan${query}`);
+  }
+
+  async getFieldSalesAnalytics(params?: {
+    from_date?: string;
+    to_date?: string;
+    branch_id?: number;
+    employee_id?: number;
+  }): Promise<ApiResponse<FieldSalesAnalytics>> {
+    const qs = new URLSearchParams();
+    if (params?.from_date) qs.append('from_date', params.from_date);
+    if (params?.to_date) qs.append('to_date', params.to_date);
+    if (params?.branch_id) qs.append('branch_id', String(params.branch_id));
+    if (params?.employee_id) qs.append('employee_id', String(params.employee_id));
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/crm/field-sales/analytics${query}`);
+  }
+
+  async syncOfflineFieldSalesDrafts(drafts: any[]): Promise<ApiResponse<{
+    synced_count: number;
+    duplicates_ignored: number;
+    synced_visit_ids: number[];
+    disclaimer: string;
+  }>> {
+    return this.request('/crm/field-sales/sync-offline', {
+      method: 'POST',
+      body: JSON.stringify({ drafts }),
+    });
+  }
+
+  async syncOfflineDrafts(drafts: any[]): Promise<ApiResponse<{
+    synced_count: number;
+    duplicates_ignored: number;
+    synced_visit_ids: number[];
+    disclaimer: string;
+    processed?: number;
+  }>> {
+    return this.syncOfflineFieldSalesDrafts(drafts);
+  }
+
+  async getIndiaSettings(): Promise<ApiResponse<IndiaSettingsItem>> {
+    return this.request('/crm/india/settings');
+  }
+
+  async formatInrAmount(amount: number): Promise<ApiResponse<{ raw_amount: number; formatted_inr: string; formatted_short: string }>> {
+    return this.request('/crm/india/format-inr', {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    });
+  }
+
+  async getIndiaTranslations(lang: string = 'en'): Promise<ApiResponse<{ language: string; translations: Record<string, string> }>> {
+    return this.request(`/crm/india/translations/${lang}`);
   }
 
   // ==========================================
@@ -5895,6 +6702,552 @@ class ApiClient {
       if (v !== undefined && v !== null && v !== '') q.append(k, String(v));
     });
     return this.request(`/crm/sales-commissions/report${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
+  // -------------------------------------------------------------------------
+  // PROMPT 45: Advanced Multi-Branch and Multi-Location Business Management
+  // -------------------------------------------------------------------------
+
+  async getBranches(params: { search?: string; is_active?: boolean; city?: string } = {}): Promise<ApiResponse<BranchItem[]> & { meta?: any }> {
+    const q = new URLSearchParams();
+    if (params.search) q.append('search', params.search);
+    if (params.is_active !== undefined) q.append('is_active', String(params.is_active));
+    if (params.city) q.append('city', params.city);
+    return this.request(`/crm/branches${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
+  async getBranch(id: number): Promise<ApiResponse<BranchItem>> {
+    return this.request(`/crm/branches/${id}`);
+  }
+
+  async createBranch(data: Partial<BranchItem> & { department_ids?: number[] }): Promise<ApiResponse<BranchItem>> {
+    return this.request('/crm/branches', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBranch(id: number, data: Partial<BranchItem> & { department_ids?: number[] }): Promise<ApiResponse<BranchItem>> {
+    return this.request(`/crm/branches/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBranch(id: number): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/crm/branches/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async setBranchStatus(id: number, is_active: boolean): Promise<ApiResponse<BranchItem>> {
+    return this.request(`/crm/branches/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active }),
+    });
+  }
+
+  async assignEmployeesToBranch(id: number, user_ids: number[], department_id?: number): Promise<ApiResponse<any>> {
+    return this.request(`/crm/branches/${id}/employees`, {
+      method: 'POST',
+      body: JSON.stringify({ user_ids, department_id }),
+    });
+  }
+
+  async transferBranchRecord(data: {
+    transferable_type: string;
+    transferable_id: number;
+    to_branch_id: number;
+    reason?: string;
+    approval_notes?: string;
+    metadata?: Record<string, any>;
+  }): Promise<ApiResponse<BranchTransferItem>> {
+    return this.request('/crm/branches/transfers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getBranchTransferHistory(params: {
+    transferable_type?: string;
+    branch_id?: number;
+    per_page?: number;
+    page?: number;
+  } = {}): Promise<ApiResponse<BranchTransferItem[]> & { meta?: any }> {
+    const q = new URLSearchParams();
+    if (params.transferable_type) q.append('transferable_type', params.transferable_type);
+    if (params.branch_id) q.append('branch_id', String(params.branch_id));
+    if (params.per_page) q.append('per_page', String(params.per_page));
+    if (params.page) q.append('page', String(params.page));
+    return this.request(`/crm/branches/transfers/history${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
+  async getBranchDashboard(id: number): Promise<ApiResponse<BranchDashboardMetrics>> {
+    return this.request(`/crm/branches/${id}/dashboard`);
+  }
+
+  async getConsolidatedBranchAnalytics(params: {
+    start_date?: string;
+    end_date?: string;
+    department_id?: number;
+  } = {}): Promise<ApiResponse<ConsolidatedBranchAnalytics>> {
+    const q = new URLSearchParams();
+    if (params.start_date) q.append('start_date', params.start_date);
+    if (params.end_date) q.append('end_date', params.end_date);
+    if (params.department_id) q.append('department_id', String(params.department_id));
+    return this.request(`/crm/branches/analytics/consolidated${q.toString() ? `?${q.toString()}` : ''}`);
+  }
+
+  async getBranchSettings(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/crm/branches/${id}/settings`);
+  }
+
+  async updateBranchSettings(id: number, data: any): Promise<ApiResponse<any>> {
+    return this.request(`/crm/branches/${id}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getBranchSalesTargets(id: number): Promise<ApiResponse<BranchSalesTargetItem[]>> {
+    return this.request(`/crm/branches/${id}/sales-targets`);
+  }
+
+  async saveBranchSalesTarget(id: number, data: Partial<BranchSalesTargetItem>): Promise<ApiResponse<BranchSalesTargetItem>> {
+    return this.request(`/crm/branches/${id}/sales-targets`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  setAuthToken(token: string | null) {
+    if (token) {
+      storage.setItem('crm_token', token);
+    } else {
+      storage.removeItem('crm_token');
+    }
+  }
+
+  getAuthToken(): string | null {
+    return storage.getItem('crm_token');
+  }
+
+  // ---------------------------------------------------------------------------
+  // PROMPT 46: Customer Self-Service Portal & Online Appointment Booking
+  // ---------------------------------------------------------------------------
+
+  // Portal Authentication
+  async portalRegister(data: { name: string; email: string; password: string; password_confirmation: string; phone?: string; branch_id?: number }): Promise<ApiResponse<{ token: string; account: CustomerAccountItem }>> {
+    return this.request('/portal/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async portalLogin(data: { email: string; password: string }): Promise<ApiResponse<{ token: string; account: CustomerAccountItem }>> {
+    const res = await this.request<{ token: string; account: CustomerAccountItem }>('/portal/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (res.data?.token) {
+      this.setAuthToken(res.data.token);
+    }
+    return res;
+  }
+
+  async portalLogout(): Promise<ApiResponse<{ success: boolean }>> {
+    const res = await this.request<{ success: boolean }>('/portal/auth/logout', { method: 'POST' });
+    this.setAuthToken(null);
+    return res;
+  }
+
+  // Customer Dashboard & Profile
+  async getPortalDashboard(): Promise<ApiResponse<CustomerDashboardData>> {
+    return this.request('/portal/dashboard');
+  }
+
+  async getPortalProfile(): Promise<ApiResponse<{ account: CustomerAccountItem; customer: any }>> {
+    return this.request('/portal/profile');
+  }
+
+  async updatePortalProfile(data: { name?: string; phone?: string; billing_address?: string; shipping_address?: string; gstin?: string }): Promise<ApiResponse<any>> {
+    return this.request('/portal/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async changePortalPassword(data: { current_password: string; password: string; password_confirmation: string }): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request('/portal/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Quotation Management
+  async getPortalQuotations(params: { page?: number; per_page?: number } = {}): Promise<ApiResponse<any>> {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.per_page) query.set('per_page', String(params.per_page));
+    return this.request(`/portal/quotations?${query.toString()}`);
+  }
+
+  async getPortalQuotation(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/portal/quotations/${id}`);
+  }
+
+  async acceptPortalQuotation(id: number, notes?: string): Promise<ApiResponse<any>> {
+    return this.request(`/portal/quotations/${id}/accept`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  }
+
+  async rejectPortalQuotation(id: number, reason: string): Promise<ApiResponse<any>> {
+    return this.request(`/portal/quotations/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async requestPortalQuotationRevision(id: number, notes: string): Promise<ApiResponse<any>> {
+    return this.request(`/portal/quotations/${id}/request-revision`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  }
+
+  // Invoices & Payments
+  async getPortalInvoices(params: { page?: number; per_page?: number } = {}): Promise<ApiResponse<any>> {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.per_page) query.set('per_page', String(params.per_page));
+    return this.request(`/portal/invoices?${query.toString()}`);
+  }
+
+  async getPortalInvoice(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/portal/invoices/${id}`);
+  }
+
+  async payPortalInvoice(id: number, data: { amount: number; payment_method: string; transaction_reference?: string }): Promise<ApiResponse<any>> {
+    return this.request(`/portal/invoices/${id}/pay`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Projects & Documents
+  async getPortalProjects(params: { page?: number; per_page?: number } = {}): Promise<ApiResponse<any>> {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.per_page) query.set('per_page', String(params.per_page));
+    return this.request(`/portal/projects?${query.toString()}`);
+  }
+
+  async getPortalProject(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/portal/projects/${id}`);
+  }
+
+  async getPortalDocuments(): Promise<ApiResponse<any[]>> {
+    return this.request('/portal/documents');
+  }
+
+  // Support Tickets
+  async getPortalTickets(params: { page?: number; per_page?: number } = {}): Promise<ApiResponse<any>> {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.per_page) query.set('per_page', String(params.per_page));
+    return this.request(`/portal/tickets?${query.toString()}`);
+  }
+
+  async createPortalTicket(data: { subject: string; description: string; priority?: string; category_id?: number }): Promise<ApiResponse<any>> {
+    return this.request('/portal/tickets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPortalTicket(id: number): Promise<ApiResponse<any>> {
+    return this.request(`/portal/tickets/${id}`);
+  }
+
+  async replyPortalTicket(id: number, message: string, attachments?: any[]): Promise<ApiResponse<any>> {
+    return this.request(`/portal/tickets/${id}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ message, attachments }),
+    });
+  }
+
+  async submitPortalTicketFeedback(id: number, csat_score: number, csat_feedback?: string): Promise<ApiResponse<any>> {
+    return this.request(`/portal/tickets/${id}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ csat_score, csat_feedback }),
+    });
+  }
+
+  // Appointments
+  async getPortalAppointments(params: { page?: number; per_page?: number } = {}): Promise<ApiResponse<any>> {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.per_page) query.set('per_page', String(params.per_page));
+    return this.request(`/portal/appointments?${query.toString()}`);
+  }
+
+  async bookPortalAppointment(data: {
+    service_id: number;
+    branch_id?: number;
+    meeting_date: string;
+    start_time: string;
+    end_time?: string;
+    organizer_id?: number;
+    title?: string;
+    notes?: string;
+    timezone?: string;
+    location_type?: string;
+    location_address?: string;
+  }): Promise<ApiResponse<any>> {
+    return this.request('/portal/appointments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async reschedulePortalAppointment(id: number, data: { meeting_date: string; start_time: string }): Promise<ApiResponse<any>> {
+    return this.request(`/portal/appointments/${id}/reschedule`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelPortalAppointment(id: number, reason: string): Promise<ApiResponse<any>> {
+    return this.request(`/portal/appointments/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async getPortalServices(): Promise<ApiResponse<BookableServiceItem[]>> {
+    return this.request('/portal/services');
+  }
+
+  // Public Online Booking Page
+  async getPublicBookingConfig(slug: string): Promise<ApiResponse<PublicBookingConfig>> {
+    return this.request(`/public/booking/${slug}`);
+  }
+
+  async getPublicBookingSlots(slug: string, params: { service_id: number; date: string; branch_id?: number; staff_id?: number }): Promise<ApiResponse<{ date: string; service: BookableServiceItem; slots: PublicBookingSlot[] }>> {
+    const query = new URLSearchParams();
+    query.set('service_id', String(params.service_id));
+    query.set('date', params.date);
+    if (params.branch_id) query.set('branch_id', String(params.branch_id));
+    if (params.staff_id) query.set('staff_id', String(params.staff_id));
+    return this.request(`/public/booking/${slug}/slots?${query.toString()}`);
+  }
+
+  async submitPublicBooking(slug: string, data: {
+    service_id: number;
+    branch_id?: number;
+    meeting_date: string;
+    start_time: string;
+    customer_name: string;
+    customer_email: string;
+    customer_phone?: string;
+    notes?: string;
+  }): Promise<ApiResponse<{ meeting: any; booking_reference: string }>> {
+    return this.request(`/public/booking/${slug}/book`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Admin CRM Portal & Bookable Services
+  async getPortalSettings(): Promise<ApiResponse<PortalSettingItem>> {
+    return this.request('/crm/portal-settings');
+  }
+
+  async updatePortalSettings(data: Partial<PortalSettingItem>): Promise<ApiResponse<PortalSettingItem>> {
+    return this.request('/crm/portal-settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async inviteCustomerToPortal(customerId: number): Promise<ApiResponse<{ customer: any; account: CustomerAccountItem; invite_token: string; invite_url: string }>> {
+    return this.request(`/crm/customers/${customerId}/invite-portal`, {
+      method: 'POST',
+    });
+  }
+
+  async getBookableServices(params: { branch_id?: number; is_active?: boolean } = {}): Promise<ApiResponse<BookableServiceItem[]>> {
+    const query = new URLSearchParams();
+    if (params.branch_id) query.set('branch_id', String(params.branch_id));
+    if (params.is_active !== undefined) query.set('is_active', String(params.is_active));
+    return this.request(`/crm/bookable-services?${query.toString()}`);
+  }
+
+  async createBookableService(data: Partial<BookableServiceItem>): Promise<ApiResponse<BookableServiceItem>> {
+    return this.request('/crm/bookable-services', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBookableService(id: number, data: Partial<BookableServiceItem>): Promise<ApiResponse<BookableServiceItem>> {
+    return this.request(`/crm/bookable-services/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBookableService(id: number): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request(`/crm/bookable-services/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // --------------------------------------------------------------------
+  // PROMPT 50: Industry Templates, Entitlements & SaaS Super Admin
+  // --------------------------------------------------------------------
+
+  // Industry Templates
+  async getIndustryTemplates(): Promise<ApiResponse<IndustryTemplateItem[]>> {
+    return this.request('/saas/templates');
+  }
+
+  async getCurrentIndustryTemplate(): Promise<ApiResponse<TenantAppliedTemplateItem | null>> {
+    return this.request('/saas/templates/current');
+  }
+
+  async getIndustryTemplate(code: string): Promise<ApiResponse<IndustryTemplateItem>> {
+    return this.request(`/saas/templates/${code}`);
+  }
+
+  async applyIndustryTemplate(
+    templateCode: string,
+    replaceExisting: boolean = false
+  ): Promise<ApiResponse<{ applied_template: TenantAppliedTemplateItem; template: IndustryTemplateItem; created_stages_count: number; created_fields_count: number }>> {
+    return this.request('/saas/templates/apply', {
+      method: 'POST',
+      body: JSON.stringify({ template_code: templateCode, replace_existing: replaceExisting }),
+    });
+  }
+
+  // SaaS Onboarding
+  async registerSaasOrganization(
+    payload: SaasOnboardingRegisterPayload
+  ): Promise<ApiResponse<{ tenant: any; user: any; token: string; template_result?: any }>> {
+    return this.request('/saas/onboarding/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getSaasOnboardingStatus(): Promise<ApiResponse<{ onboarding_status: string; onboarding_step: number; is_completed: boolean; current_step: number; completed_steps: number[] }>> {
+    return this.request('/saas/onboarding/status');
+  }
+
+  async saveSaasOnboardingStep(
+    payload: SaasOnboardingStepPayload
+  ): Promise<ApiResponse<{ onboarding_step: number; onboarding_status: string; is_completed: boolean }>> {
+    return this.request('/saas/onboarding/step', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Feature Entitlements Engine
+  async getFeatureEntitlements(): Promise<ApiResponse<FeatureEntitlementCatalog>> {
+    return this.request('/saas/entitlements');
+  }
+
+  async verifyFeatureEntitlement(
+    featureKey: string
+  ): Promise<ApiResponse<FeatureEntitlementVerification>> {
+    return this.request('/saas/entitlements/verify', {
+      method: 'POST',
+      body: JSON.stringify({ feature_key: featureKey }),
+    });
+  }
+
+  // Platform Super Admin Console
+  async getPlatformConsoleOverview(): Promise<ApiResponse<PlatformConsoleOverview>> {
+    return this.request('/platform/console/overview');
+  }
+
+  async suspendTenant(
+    id: number,
+    reason: string
+  ): Promise<ApiResponse<{ tenant: PlatformTenantItem; message: string }>> {
+    return this.request(`/platform/console/tenants/${id}/suspend`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async reactivateTenant(
+    id: number
+  ): Promise<ApiResponse<{ tenant: PlatformTenantItem; message: string }>> {
+    return this.request(`/platform/console/tenants/${id}/reactivate`, {
+      method: 'POST',
+    });
+  }
+
+  async changeTenantPlan(
+    id: number,
+    planCode: string,
+    billingCycle: string = 'monthly'
+  ): Promise<ApiResponse<{ subscription: any; message: string }>> {
+    return this.request(`/platform/console/tenants/${id}/change-plan`, {
+      method: 'POST',
+      body: JSON.stringify({ plan_code: planCode, billing_cycle: billingCycle }),
+    });
+  }
+
+  async getPlatformPlans(): Promise<ApiResponse<PlatformPlanItem[]>> {
+    return this.request('/platform/console/plans');
+  }
+
+  async savePlatformPlan(
+    data: Partial<PlatformPlanItem>
+  ): Promise<ApiResponse<PlatformPlanItem>> {
+    return this.request('/platform/console/plans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPlatformRevenueReport(
+    year?: number
+  ): Promise<ApiResponse<PlatformRevenueReport>> {
+    const query = new URLSearchParams();
+    if (year) query.set('year', String(year));
+    return this.request(`/platform/console/revenue?${query.toString()}`);
+  }
+
+  async getPlatformAnnouncements(): Promise<ApiResponse<PlatformAnnouncementItem[]>> {
+    return this.request('/platform/console/announcements');
+  }
+
+  async createPlatformAnnouncement(
+    data: Partial<PlatformAnnouncementItem>
+  ): Promise<ApiResponse<PlatformAnnouncementItem>> {
+    return this.request('/platform/console/announcements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPlatformBackups(): Promise<ApiResponse<PlatformBackupRecordItem[]>> {
+    return this.request('/platform/console/backups');
+  }
+
+  async triggerPlatformBackup(
+    data: { backup_type?: string; notes?: string } = {}
+  ): Promise<ApiResponse<PlatformBackupRecordItem>> {
+    return this.request('/platform/console/backups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 }
 

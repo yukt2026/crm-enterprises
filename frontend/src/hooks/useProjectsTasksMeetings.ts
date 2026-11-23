@@ -508,3 +508,211 @@ export function useMeetingCalendarEvents(params?: { start_date?: string; end_dat
     },
   });
 }
+
+// ==========================================
+// 4. ENTERPRISE PROJECT PROFITABILITY & ADVANCED OPERATIONS
+// ==========================================
+
+export function useProjectFinancials(projectId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['projectFinancials', projectId],
+    queryFn: async () => {
+      if (!projectId) return null;
+      const res = await api.getProjectFinancials(projectId);
+      return res.data;
+    },
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useProjectGantt(projectId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['projectGantt', projectId],
+    queryFn: async () => {
+      if (!projectId) return null;
+      const res = await api.getProjectGantt(projectId);
+      return res.data;
+    },
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useProjectWorkload(branchId?: number) {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['projectWorkload', workspaceId, branchId],
+    queryFn: async () => {
+      const res = await api.getProjectWorkload(branchId);
+      return res.data || [];
+    },
+  });
+}
+
+export function useProjectDocuments(projectId: number | null | undefined, clientOnly: boolean = false) {
+  return useQuery({
+    queryKey: ['projectDocuments', projectId, clientOnly],
+    queryFn: async () => {
+      if (!projectId) return [];
+      const res = await api.getProjectDocuments(projectId, clientOnly);
+      return res.data || [];
+    },
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useUploadProjectDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, data }: { projectId: number; data: any }) => {
+      const res = await api.uploadProjectDocument(projectId, data);
+      return res.data;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['projectDocuments', vars.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['project', vars.projectId] });
+    },
+  });
+}
+
+export function useToggleProjectDocumentVisibility() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ documentId, isClientVisible, projectId }: { documentId: number; isClientVisible: boolean; projectId?: number }) => {
+      const res = await api.toggleProjectDocumentVisibility(documentId, isClientVisible);
+      return res.data;
+    },
+    onSuccess: (_, vars) => {
+      if (vars.projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projectDocuments', vars.projectId] });
+      }
+    },
+  });
+}
+
+export function useTransitionProjectStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status, reason }: { id: number; status: string; reason?: string }) => {
+      const res = await api.transitionProjectStatus(id, status, reason);
+      return res.data;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['project', vars.id] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['projectMetrics'] });
+    },
+  });
+}
+
+export function useSubmitMilestoneReview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ milestoneId, summary }: { milestoneId: number; summary?: string }) => {
+      const res = await api.submitMilestoneForReview(milestoneId, summary);
+      return res.data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['projectMilestones', data?.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['project', data?.project_id] });
+    },
+  });
+}
+
+export function useApproveMilestoneInternal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ milestoneId, notes }: { milestoneId: number; notes?: string }) => {
+      const res = await api.approveMilestoneInternal(milestoneId, notes);
+      return res.data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['projectMilestones', data?.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['project', data?.project_id] });
+    },
+  });
+}
+
+export function useSendMilestoneToClient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ milestoneId, notes }: { milestoneId: number; notes?: string }) => {
+      const res = await api.sendMilestoneToClient(milestoneId, notes);
+      return res.data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['projectMilestones', data?.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['project', data?.project_id] });
+    },
+  });
+}
+
+export function useTimesheets(params?: { user_id?: number; project_id?: number; status?: string; is_running?: boolean }) {
+  const currentWorkspace = useCRMStore((s) => s.currentWorkspace);
+  const workspaceId = currentWorkspace?.id || 'default';
+
+  return useQuery({
+    queryKey: ['timesheets', workspaceId, params],
+    queryFn: async () => {
+      const res = await api.getTimesheets(params);
+      return res.data || [];
+    },
+  });
+}
+
+export function useStartTaskTimer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (taskId: number) => {
+      const res = await api.startTaskTimer(taskId);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useStopTaskTimer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ logId, description }: { logId: number; description?: string }) => {
+      const res = await api.stopTaskTimer(logId, description);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useApproveTimeLog() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (logId: number) => {
+      const res = await api.approveTimeLog(logId);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useRejectTimeLog() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ logId, reason }: { logId: number; reason: string }) => {
+      const res = await api.rejectTimeLog(logId, reason);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}

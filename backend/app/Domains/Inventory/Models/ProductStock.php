@@ -20,15 +20,21 @@ class ProductStock extends Model
         'warehouse_id',
         'current_stock',
         'reserved_stock',
+        'incoming_stock',
         'minimum_stock',
         'damaged_stock',
+        'returned_stock',
+        'reorder_level',
     ];
 
     protected $casts = [
         'current_stock' => 'decimal:2',
         'reserved_stock' => 'decimal:2',
+        'incoming_stock' => 'decimal:2',
         'minimum_stock' => 'decimal:2',
         'damaged_stock' => 'decimal:2',
+        'returned_stock' => 'decimal:2',
+        'reorder_level' => 'decimal:2',
     ];
 
     protected $appends = [

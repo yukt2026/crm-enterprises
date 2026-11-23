@@ -3,10 +3,14 @@
 namespace App\Domains\Workflow\Services;
 
 use App\Domains\Workflow\Models\Workflow;
+use App\Domains\Workflow\Models\WorkflowApproval;
+use App\Domains\Workflow\Models\WorkflowAutomationLimit;
 use App\Domains\Workflow\Models\WorkflowRun;
 use App\Domains\Workflow\Models\WorkflowStepLog;
 use App\Domains\Workflow\Models\WorkflowVersion;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class WorkflowExecutionEngine
@@ -17,9 +21,9 @@ class WorkflowExecutionEngine
     ) {}
 
     /**
-     * Dispatch an event to matching published workflows.
+     * Dispatch an event to matching published workflows with loop protection and usage limits.
      */
-    public function trigger(int $tenantId, string $triggerType, array $payload, ?string $idempotencyKey = null): array
+    public function trigger(int $tenantId, string $triggerType, array $payload, ?string $idempotencyKey = null, ?int $parentRunId = null, int $depth = 1): array
     {
         // 1. Idempotency Check: Prevent duplicate event runs
         if ($idempotencyKey) {
@@ -36,7 +40,42 @@ class WorkflowExecutionEngine
             }
         }
 
-        // 2. Find published & active workflows matching trigger
+        // 2. Loop Protection: Check recursion depth
+        if ($depth > 10) {
+            return [
+                'status' => 'loop_detected',
+                'message' => "Execution loop detected: maximum recursion depth ({$depth}) exceeded.",
+            ];
+        }
+
+        // 3. Loop Protection: Rate-limit runs per entity within rolling 15 minutes
+        $entityType = $payload['entity_type'] ?? null;
+        $entityId = $payload['entity_id'] ?? null;
+        if ($entityType && $entityId) {
+            $recentRunsCount = WorkflowRun::where('tenant_id', $tenantId)
+                ->where('entity_type', $entityType)
+                ->where('entity_id', $entityId)
+                ->where('created_at', '>=', now()->subMinutes(15))
+                ->count();
+
+            if ($recentRunsCount >= 10) {
+                return [
+                    'status' => 'loop_detected',
+                    'message' => "Execution loop detected: Entity [{$entityType}:{$entityId}] triggered {$recentRunsCount} runs in 15 minutes. Execution halted to protect system.",
+                ];
+            }
+        }
+
+        // 4. Check monthly execution limits
+        $limits = WorkflowAutomationLimit::getForTenant($tenantId);
+        if ($limits->max_monthly_executions > 0 && $limits->current_month_executions >= $limits->max_monthly_executions) {
+            return [
+                'status' => 'limit_exceeded',
+                'message' => "Organization monthly automation limit of {$limits->max_monthly_executions} executions reached.",
+            ];
+        }
+
+        // 5. Find published & active workflows matching trigger
         $workflows = Workflow::where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->where('status', 'published')
@@ -53,18 +92,26 @@ class WorkflowExecutionEngine
                 'tenant_id' => $tenantId,
                 'workflow_id' => $workflow->id,
                 'workflow_version_id' => $version->id,
+                'parent_run_id' => $parentRunId,
+                'depth' => $depth,
                 'trigger_event' => $triggerType,
                 'idempotency_key' => $idempotencyKey,
-                'entity_type' => $payload['entity_type'] ?? null,
-                'entity_id' => $payload['entity_id'] ?? null,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
                 'status' => 'running',
+                'is_dry_run' => false,
                 'trigger_payload' => $payload,
-                'context_data' => array_merge($payload, ['trigger_event' => $triggerType]),
+                'context_data' => array_merge($payload, [
+                    'trigger_event' => $triggerType,
+                    'workflow_id' => $workflow->id,
+                    'tenant_id' => $tenantId,
+                ]),
                 'started_at' => now(),
             ]);
 
             $workflow->increment('total_runs_count');
             $workflow->update(['last_run_at' => now()]);
+            $limits->increment('current_month_executions');
 
             $this->executeGraph($run, $version->definition);
             $runs[] = $run->fresh(['stepLogs']);
@@ -80,7 +127,7 @@ class WorkflowExecutionEngine
     /**
      * Execute the node graph of a workflow run.
      */
-    public function executeGraph(WorkflowRun $run, array $definition, bool $isDryRun = false, ?string $startNodeId = null): array
+    public function executeGraph(WorkflowRun $run, array $definition, bool $isDryRun = false, ?string $startNodeId = null, ?string $overrideBranch = null): array
     {
         $nodes = collect($definition['nodes'] ?? [])->keyBy('id');
         $edges = collect($definition['edges'] ?? []);
@@ -97,9 +144,10 @@ class WorkflowExecutionEngine
 
         $context = $run->context_data ?? [];
         $tenantId = $run->tenant_id;
-        $maxSteps = 50; // Loop prevention guardrail
+        $maxSteps = 50; // Guardrail against infinite internal graphs
         $stepCount = 0;
         $trace = [];
+        $engineStart = microtime(true);
 
         while ($currentNode && $stepCount < $maxSteps) {
             $stepCount++;
@@ -110,8 +158,8 @@ class WorkflowExecutionEngine
 
             $run->update(['current_node_id' => $nodeId]);
 
-            // Branch decision holder
-            $branchTaken = null;
+            $branchTaken = $overrideBranch;
+            $overrideBranch = null; // consume once
             $stepStatus = 'completed';
             $errorMessage = null;
             $outputState = null;
@@ -132,7 +180,15 @@ class WorkflowExecutionEngine
                     case 'action':
                         $actionType = $currentNode['data']['action_type'] ?? 'crm.add_note';
                         $actionParams = $currentNode['data']['params'] ?? [];
-                        $actionResult = $this->actionExecutor->execute($actionType, $actionParams, $context, $tenantId, $isDryRun);
+                        $actionResult = $this->actionExecutor->execute(
+                            actionType: $actionType,
+                            params: $actionParams,
+                            context: $context,
+                            tenantId: $tenantId,
+                            isDryRun: $isDryRun,
+                            runId: $run->id,
+                            nodeId: $nodeId
+                        );
                         $outputState = $actionResult;
                         if (($actionResult['status'] ?? '') === 'failed') {
                             $stepStatus = 'failed';
@@ -140,10 +196,45 @@ class WorkflowExecutionEngine
                         }
                         break;
 
+                    case 'approval':
+                        if ($isDryRun) {
+                            $stepStatus = 'simulated';
+                            $outputState = ['status' => 'simulated', 'message' => 'Human approval node simulated.'];
+                            $branchTaken = 'approved';
+                        } else {
+                            $approvalConfig = $currentNode['data'] ?? [];
+                            $approvalResult = $this->actionExecutor->execute(
+                                actionType: 'approval.request_approval',
+                                params: array_merge($approvalConfig, ['workflow_id' => $run->workflow_id]),
+                                context: $context,
+                                tenantId: $tenantId,
+                                isDryRun: false,
+                                runId: $run->id,
+                                nodeId: $nodeId
+                            );
+
+                            $run->update([
+                                'status' => 'waiting_approval',
+                                'approval_id' => $approvalResult['approval_id'] ?? null,
+                                'context_data' => $context,
+                            ]);
+
+                            $stepStatus = 'waiting_approval';
+                            $outputState = $approvalResult;
+                        }
+                        break;
+
                     case 'delay':
                         $duration = (int) ($currentNode['data']['duration'] ?? 1);
                         $unit = $currentNode['data']['unit'] ?? 'hours'; // minutes, hours, days
+                        $workingHoursOnly = (bool) ($currentNode['data']['working_hours_only'] ?? false);
+
                         $resumeAt = now()->add($duration, $unit);
+
+                        // If working hours only, adjust to within 09:00 - 18:00 IST Monday-Saturday
+                        if ($workingHoursOnly) {
+                            $resumeAt = $this->calculateNextWorkingTime($resumeAt);
+                        }
 
                         if (!$isDryRun) {
                             $run->update([
@@ -154,7 +245,12 @@ class WorkflowExecutionEngine
                         }
 
                         $stepStatus = 'waiting';
-                        $outputState = ['delay_duration' => $duration, 'unit' => $unit, 'resume_at' => $resumeAt->toIso8601String()];
+                        $outputState = [
+                            'delay_duration' => $duration,
+                            'unit' => $unit,
+                            'working_hours_only' => $workingHoursOnly,
+                            'resume_at' => $resumeAt->toIso8601String(),
+                        ];
                         break;
 
                     case 'wait':
@@ -215,34 +311,35 @@ class WorkflowExecutionEngine
                 'duration_ms' => $durationMs,
             ];
 
-            // If node failed or suspended, halt loop
+            // If node failed or suspended in waiting/approval, halt loop
             if ($stepStatus === 'failed') {
                 if (!$isDryRun) {
                     $run->update([
                         'status' => 'failed',
                         'error_message' => $errorMessage,
                         'completed_at' => now(),
+                        'execution_duration_ms' => (int) round((microtime(true) - $engineStart) * 1000),
                     ]);
                 }
                 break;
             }
 
-            if ($stepStatus === 'waiting' || $nodeType === 'stop') {
+            if (in_array($stepStatus, ['waiting', 'waiting_approval']) || $nodeType === 'stop') {
                 break;
             }
 
             // Find next node along edge
             $nextEdge = null;
-            if ($nodeType === 'condition' && $branchTaken) {
-                // Match edge with sourceHandle or label matching branch (true/false)
+            if (in_array($nodeType, ['condition', 'approval']) && $branchTaken) {
+                // Match edge with sourceHandle or label matching branch (e.g. true/false or approved/rejected)
                 $nextEdge = $edges->first(function ($e) use ($nodeId, $branchTaken) {
                     return $e['source'] === $nodeId && (
                         ($e['sourceHandle'] ?? null) === $branchTaken ||
-                        strtolower($e['label'] ?? '') === $branchTaken
+                        strtolower($e['label'] ?? '') === strtolower($branchTaken)
                     );
                 });
 
-                // Fallback to any edge from this condition if not labelled
+                // Fallback to any edge if not labelled
                 if (!$nextEdge) {
                     $nextEdge = $edges->firstWhere('source', $nodeId);
                 }
@@ -263,6 +360,7 @@ class WorkflowExecutionEngine
                 'status' => 'completed',
                 'context_data' => $context,
                 'completed_at' => now(),
+                'execution_duration_ms' => (int) round((microtime(true) - $engineStart) * 1000),
             ]);
         }
 
@@ -278,7 +376,7 @@ class WorkflowExecutionEngine
      */
     public function resume(WorkflowRun $run, ?array $eventPayload = null): WorkflowRun
     {
-        if ($run->status !== 'waiting') {
+        if (!in_array($run->status, ['waiting', 'waiting_approval'])) {
             return $run;
         }
 
@@ -308,6 +406,61 @@ class WorkflowExecutionEngine
     }
 
     /**
+     * Decide on an approval node and advance the workflow.
+     */
+    public function decideApproval(WorkflowApproval $approval, string $decision, ?string $comments = null, ?User $user = null): WorkflowRun
+    {
+        $status = $decision === 'approve' ? 'approved' : 'rejected';
+        $branch = $decision === 'approve' ? 'approved' : 'rejected';
+
+        $approval->update([
+            'status' => $status,
+            'comments' => $comments,
+            'decision_by_user_id' => $user?->id,
+            'decision_at' => now(),
+        ]);
+
+        $run = $approval->run;
+        if (!$run || $run->status !== 'waiting_approval') {
+            return $run;
+        }
+
+        $run->update([
+            'status' => 'running',
+            'context_data' => array_merge($run->context_data ?? [], [
+                'approval_decision' => $status,
+                'approval_comments' => $comments,
+            ]),
+        ]);
+
+        $version = $run->version;
+        if (!$version) return $run;
+
+        $edges = collect($version->definition['edges'] ?? []);
+        $nodeId = $approval->node_id;
+
+        // Find edge for approved/rejected or fallback to any edge
+        $nextEdge = $edges->first(function ($e) use ($nodeId, $branch) {
+            return $e['source'] === $nodeId && (
+                ($e['sourceHandle'] ?? null) === $branch ||
+                strtolower($e['label'] ?? '') === $branch
+            );
+        });
+
+        if ($nextEdge && isset($nextEdge['target'])) {
+            $this->executeGraph($run, $version->definition, false, $nextEdge['target']);
+        } else {
+            // If rejected and no explicit reject edge, complete the workflow
+            $run->update([
+                'status' => $status === 'approved' ? 'completed' : 'cancelled',
+                'completed_at' => now(),
+            ]);
+        }
+
+        return $run->fresh(['stepLogs']);
+    }
+
+    /**
      * Test / Simulation mode: evaluates definition on sample payload without side-effects.
      */
     public function simulate(Workflow $workflow, array $definition, array $samplePayload): array
@@ -318,10 +471,43 @@ class WorkflowExecutionEngine
             'workflow_version_id' => $workflow->current_version,
             'trigger_event' => $workflow->trigger_type,
             'trigger_payload' => $samplePayload,
-            'context_data' => array_merge($samplePayload, ['trigger_event' => $workflow->trigger_type]),
+            'context_data' => array_merge($samplePayload, [
+                'trigger_event' => $workflow->trigger_type,
+                'workflow_id' => $workflow->id,
+            ]),
             'status' => 'running',
+            'is_dry_run' => true,
         ]);
 
         return $this->executeGraph($mockRun, $definition, true);
+    }
+
+    /**
+     * Adjust time to fall within 09:00 - 18:00 IST Monday through Saturday.
+     */
+    protected function calculateNextWorkingTime(Carbon $target): Carbon
+    {
+        $tz = 'Asia/Kolkata';
+        $time = $target->copy()->setTimezone($tz);
+
+        // If Sunday, roll to Monday 09:00 AM
+        if ($time->isSunday()) {
+            $time->addDay()->setTime(9, 0, 0);
+        }
+
+        // If before 09:00 AM, set to 09:00 AM
+        if ($time->hour < 9) {
+            $time->setTime(9, 0, 0);
+        }
+
+        // If after 18:00 (6 PM), roll to next morning 09:00 AM
+        if ($time->hour >= 18) {
+            $time->addDay()->setTime(9, 0, 0);
+            if ($time->isSunday()) {
+                $time->addDay()->setTime(9, 0, 0);
+            }
+        }
+
+        return $time;
     }
 }

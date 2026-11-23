@@ -45,11 +45,16 @@ class ConditionEvaluator
         $operator = $rule['operator'] ?? 'equals';
         $targetValue = $rule['value'] ?? null;
 
-        // Special rule: business hours check
+        // Special rule: business hours check (e.g. 09:00 - 20:00 IST)
         if ($operator === 'in_business_hours') {
-            $now = Carbon::now('Asia/Kolkata');
+            $tz = $rule['timezone'] ?? 'Asia/Kolkata';
+            $now = Carbon::now($tz);
+            $dayOfWeek = (int) $now->format('w'); // 0 = Sunday
             $hour = (int) $now->format('H');
-            return ($hour >= 9 && $hour < 21); // 9 AM to 9 PM IST
+
+            // Default business days Mon-Sat (1 to 6), 9 AM to 8 PM
+            $isWorkingDay = $dayOfWeek >= 1 && $dayOfWeek <= 6;
+            return $isWorkingDay && ($hour >= 9 && $hour < 20);
         }
 
         // Special rule: communication consent check
@@ -66,17 +71,58 @@ class ConditionEvaluator
 
         $actualValue = $this->resolveValue($field, $context);
 
+        // Date comparison helpers
+        if (in_array($operator, ['before_date', 'after_date', 'is_today', 'is_in_past', 'is_in_future', 'within_days'])) {
+            return $this->evaluateDateRule($operator, $actualValue, $targetValue);
+        }
+
+        // Tags / Array checks
+        if (is_array($actualValue)) {
+            return match ($operator) {
+                'contains' => in_array($targetValue, $actualValue) || in_array(strtolower((string)$targetValue), array_map('strtolower', $actualValue)),
+                'not_contains' => !in_array($targetValue, $actualValue) && !in_array(strtolower((string)$targetValue), array_map('strtolower', $actualValue)),
+                'is_empty' => empty($actualValue),
+                'is_not_empty' => !empty($actualValue),
+                default => false,
+            };
+        }
+
         return match ($operator) {
             'equals' => strtolower((string)$actualValue) === strtolower((string)$targetValue),
             'not_equals' => strtolower((string)$actualValue) !== strtolower((string)$targetValue),
             'contains' => str_contains(strtolower((string)$actualValue), strtolower((string)$targetValue)),
             'not_contains' => !str_contains(strtolower((string)$actualValue), strtolower((string)$targetValue)),
+            'starts_with' => str_starts_with(strtolower((string)$actualValue), strtolower((string)$targetValue)),
+            'ends_with' => str_ends_with(strtolower((string)$actualValue), strtolower((string)$targetValue)),
             'greater_than' => is_numeric($actualValue) && is_numeric($targetValue) && ((float)$actualValue > (float)$targetValue),
             'less_than' => is_numeric($actualValue) && is_numeric($targetValue) && ((float)$actualValue < (float)$targetValue),
             'greater_or_equal' => is_numeric($actualValue) && is_numeric($targetValue) && ((float)$actualValue >= (float)$targetValue),
             'less_or_equal' => is_numeric($actualValue) && is_numeric($targetValue) && ((float)$actualValue <= (float)$targetValue),
-            'is_empty' => empty($actualValue),
-            'is_not_empty' => !empty($actualValue),
+            'is_empty' => $actualValue === null || $actualValue === '' || $actualValue === [],
+            'is_not_empty' => $actualValue !== null && $actualValue !== '' && $actualValue !== [],
+            default => false,
+        };
+    }
+
+    protected function evaluateDateRule(string $operator, mixed $actualValue, mixed $targetValue): bool
+    {
+        if (empty($actualValue)) {
+            return false;
+        }
+
+        try {
+            $actualDate = Carbon::parse($actualValue);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return match ($operator) {
+            'before_date' => $targetValue ? $actualDate->lt(Carbon::parse($targetValue)) : false,
+            'after_date' => $targetValue ? $actualDate->gt(Carbon::parse($targetValue)) : false,
+            'is_today' => $actualDate->isToday(),
+            'is_in_past' => $actualDate->isPast(),
+            'is_in_future' => $actualDate->isFuture(),
+            'within_days' => is_numeric($targetValue) && abs($actualDate->diffInDays(now())) <= (int)$targetValue,
             default => false,
         };
     }

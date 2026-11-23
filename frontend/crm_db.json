@@ -100,6 +100,28 @@
       "lastActive": "2026-11-21T11:02:54.128Z",
       "createdAt": "2026-02-10T09:15:00.000Z",
       "passwordHash": "emp123"
+    },
+    {
+      "id": "usr-1795455833366",
+      "name": "rae",
+      "email": "marcus@starlight.io",
+      "role": "Employee",
+      "status": "active",
+      "department": "Engineering",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-11-23T17:43:53.366Z",
+      "passwordHash": "AdminSecurePass2026!"
+    },
+    {
+      "id": "usr-1795455845467",
+      "name": "da",
+      "email": "john1@nexus.com",
+      "role": "Employee",
+      "status": "active",
+      "department": "Engineering",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-11-23T17:44:05.467Z",
+      "passwordHash": "AdminSecurePass2026!"
     }
   ],
   "leads": [
@@ -733,6 +755,36 @@
     }
   ],
   "activityLogs": [
+    {
+      "id": "act-1795455854627-tod1s",
+      "userId": "usr-john",
+      "userName": "John Nexus",
+      "action": "USER_LOGIN_2FA",
+      "module": "Auth",
+      "details": "User successfully passed 2FA verification.",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-23T17:44:14.627Z"
+    },
+    {
+      "id": "act-1795455845469-670m7",
+      "userId": "usr-1795455845467",
+      "userName": "da",
+      "action": "USER_REGISTER",
+      "module": "Auth",
+      "details": "Newly self-registered under das",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-23T17:44:05.469Z"
+    },
+    {
+      "id": "act-1795455833368-ewuy0",
+      "userId": "usr-1795455833366",
+      "userName": "rae",
+      "action": "USER_REGISTER",
+      "module": "Auth",
+      "details": "Newly self-registered under asd",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-23T17:43:53.368Z"
+    },
     {
       "id": "act-1795382385838-fnvqy",
       "userId": "usr-john",

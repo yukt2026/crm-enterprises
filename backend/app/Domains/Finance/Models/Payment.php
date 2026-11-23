@@ -18,6 +18,7 @@ class Payment extends Model
 
     protected $fillable = [
         'tenant_id',
+        'branch_id',
         'invoice_id',
         'customer_id',
         'amount',
@@ -50,6 +51,11 @@ class Payment extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CRM\Models\Branch::class, 'branch_id');
     }
 
     public function user(): BelongsTo

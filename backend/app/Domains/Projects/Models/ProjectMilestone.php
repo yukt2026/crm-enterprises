@@ -55,7 +55,7 @@ class ProjectMilestone extends Model
 
     public function approvalLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(MilestoneApprovalLog::class, 'project_milestone_id');
+        return $this->hasMany(MilestoneApprovalLog::class, 'milestone_id');
     }
 
     public function tasks(): \Illuminate\Database\Eloquent\Relations\HasMany

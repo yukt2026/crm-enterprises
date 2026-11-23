@@ -212,6 +212,27 @@ return new class extends Migration
                 $table->index(['tenant_id', 'project_id', 'is_client_visible'], 'prj_docs_vis_idx');
             });
         }
+
+        // 10. Link Invoices to Projects
+        if (Schema::hasTable('invoices') && !Schema::hasColumn('invoices', 'project_id')) {
+            Schema::table('invoices', function (Blueprint $table) {
+                $table->foreignId('project_id')->nullable()->after('deal_id')->constrained('projects')->nullOnDelete();
+                $table->index(['tenant_id', 'project_id'], 'invoices_project_idx');
+            });
+        }
+
+        // 11. Link Expenses to Projects
+        if (Schema::hasTable('expenses')) {
+            Schema::table('expenses', function (Blueprint $table) {
+                if (!Schema::hasColumn('expenses', 'project_id')) {
+                    $table->foreignId('project_id')->nullable()->after('id')->constrained('projects')->nullOnDelete();
+                    $table->index(['tenant_id', 'project_id'], 'expenses_project_idx');
+                }
+                if (!Schema::hasColumn('expenses', 'customer_id')) {
+                    $table->foreignId('customer_id')->nullable()->after('project_id')->constrained('customers')->nullOnDelete();
+                }
+            });
+        }
     }
 
     /**

@@ -60,6 +60,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function getTenantIdAttribute(): ?int
+    {
+        return $this->current_tenant_id;
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);

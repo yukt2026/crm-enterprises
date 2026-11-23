@@ -27,6 +27,12 @@ import {
   UserCheck,
   UserX,
   Clock3,
+  Play,
+  Square,
+  Check,
+  X,
+  Layers,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   useProjects,
@@ -58,11 +64,26 @@ import {
   useUpdateMeetingRsvp,
   useCreateMeetingFollowUpTask,
   useMeetingCalendarEvents,
+  useProjectFinancials,
+  useProjectGantt,
+  useProjectWorkload,
+  useTimesheets,
+  useStartTaskTimer,
+  useStopTaskTimer,
+  useApproveTimeLog,
+  useRejectTimeLog,
+  useTransitionProjectStatus,
 } from '../../hooks/useProjectsTasksMeetings';
 import { ProjectItem, TaskItem, MeetingItem } from '../../api/types';
 
 export const ProjectsTasksMeetingsView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'meetings' | 'reports'>('projects');
+  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'gantt' | 'profitability' | 'timesheets' | 'meetings' | 'reports'>('projects');
+
+  // Enterprise Profitability, Gantt & Timesheets states
+  const [selectedGanttProjectId, setSelectedGanttProjectId] = useState<number | null>(null);
+  const [selectedProfitabilityProjectId, setSelectedProfitabilityProjectId] = useState<number | null>(null);
+  const [timerSelectedTaskId, setTimerSelectedTaskId] = useState<number | null>(null);
+  const [timesheetStatusFilter, setTimesheetStatusFilter] = useState<string>('all');
 
   // Project states
   const [showArchivedProjects, setShowArchivedProjects] = useState(false);
@@ -106,6 +127,22 @@ export const ProjectsTasksMeetingsView: React.FC = () => {
     status: meetingStatusFilter || undefined,
   });
   const { data: calendarEvents = [] } = useMeetingCalendarEvents();
+
+  // Enterprise Profitability, Gantt & Timesheets hooks
+  const activeGanttId = selectedGanttProjectId || projects[0]?.id;
+  const activeFinId = selectedProfitabilityProjectId || projects[0]?.id;
+  const { data: ganttData, isLoading: isLoadingGantt } = useProjectGantt(activeGanttId);
+  const { data: financialsData } = useProjectFinancials(activeFinId);
+  const { data: workloadData = [] } = useProjectWorkload();
+  const { data: timesheetsData = [], isLoading: isLoadingTimesheets } = useTimesheets(
+    timesheetStatusFilter !== 'all' ? { status: timesheetStatusFilter } : undefined
+  );
+
+  const startTimerMutation = useStartTaskTimer();
+  const stopTimerMutation = useStopTaskTimer();
+  const approveTimeLogMutation = useApproveTimeLog();
+  const rejectTimeLogMutation = useRejectTimeLog();
+  const transitionStatusMutation = useTransitionProjectStatus();
 
   // Mutations
   const createProjectMutation = useCreateProject();
@@ -350,6 +387,36 @@ export const ProjectsTasksMeetingsView: React.FC = () => {
             }`}
           >
             Tasks & Kanban
+          </button>
+          <button
+            onClick={() => setActiveTab('gantt')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+              activeTab === 'gantt'
+                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            Gantt Timeline
+          </button>
+          <button
+            onClick={() => setActiveTab('profitability')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+              activeTab === 'profitability'
+                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            Profitability
+          </button>
+          <button
+            onClick={() => setActiveTab('timesheets')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+              activeTab === 'timesheets'
+                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            Timesheets & Timer
           </button>
           <button
             onClick={() => setActiveTab('meetings')}
@@ -1099,6 +1166,441 @@ export const ProjectsTasksMeetingsView: React.FC = () => {
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: GANTT & CPM TIMELINE */}
+      {activeTab === 'gantt' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Select Project:</span>
+              <select
+                value={activeGanttId || ''}
+                onChange={(e) => setSelectedGanttProjectId(Number(e.target.value))}
+                className="text-xs font-medium bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-800 dark:text-slate-200"
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code ? `[${p.code}] ` : ''}{p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {ganttData?.project && (
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span>Code: <strong className="text-slate-800 dark:text-slate-200">{ganttData.project.code || 'N/A'}</strong></span>
+                <span>Timeline: <strong className="text-slate-800 dark:text-slate-200">{ganttData.project.start_date || 'Start'} → {ganttData.project.end_date || 'Deadline'}</strong></span>
+                <span>Overall: <strong className="text-indigo-600 dark:text-indigo-400">{ganttData.project.progress}%</strong></span>
+              </div>
+            )}
+          </div>
+
+          {/* Milestones Flag Strip */}
+          {ganttData?.milestones && ganttData.milestones.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+              <h4 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Milestone className="w-4 h-4 text-amber-500" />
+                Delivery Milestones & Client Sign-off Stage
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {ganttData.milestones.map((m) => (
+                  <div key={m.id} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700 text-xs flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200">{m.title}</p>
+                      <p className="text-slate-500 text-[11px]">Due: {m.due_date || 'TBD'} • ₹{Number(m.amount || 0).toLocaleString()}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                      m.approval_status === 'client_approved' ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' :
+                      m.approval_status === 'internal_approved' ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400' :
+                      'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {m.approval_status ? m.approval_status.replace('_', ' ') : m.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Gantt Timeline Table */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-500" />
+                CPM Gantt Execution Schedule ({ganttData?.tasks?.length || 0} tasks)
+              </h3>
+            </div>
+            {isLoadingGantt ? (
+              <div className="p-8 text-center text-slate-500 text-xs">Loading Gantt schedule...</div>
+            ) : !ganttData?.tasks || ganttData.tasks.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-xs">No tasks scheduled for this project.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500">
+                      <th className="p-3 font-semibold">Task</th>
+                      <th className="p-3 font-semibold">Assignee</th>
+                      <th className="p-3 font-semibold">Timeline</th>
+                      <th className="p-3 font-semibold">Dependencies</th>
+                      <th className="p-3 font-semibold">Status</th>
+                      <th className="p-3 font-semibold">Progress Bar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {ganttData.tasks.map((task) => (
+                      <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                        <td className="p-3">
+                          <div className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            {task.is_blocked && (
+                              <span title={`Blocked: ${task.block_reason || 'Prerequisite incomplete'}`} className="px-1.5 py-0.5 rounded text-[10px] bg-rose-100 text-rose-600 font-bold">
+                                BLOCKED
+                              </span>
+                            )}
+                            {task.title}
+                          </div>
+                          {task.milestone_title && (
+                            <span className="text-[10px] text-slate-400">Milestone: {task.milestone_title}</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">
+                          {task.assigned_user?.name || 'Unassigned'}
+                        </td>
+                        <td className="p-3 text-slate-500">
+                          {task.start_date || 'Start'} → {task.due_date || 'Due'}
+                          <span className="block text-[10px] text-slate-400">{task.estimated_hours}h estimated</span>
+                        </td>
+                        <td className="p-3">
+                          {task.dependencies && task.dependencies.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {task.dependencies.map((d) => (
+                                <span key={d.depends_on_task_id} className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded text-[10px]">
+                                  Prereq #{d.depends_on_task_id} (+{d.lag_days}d)
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                            task.status === 'done' || task.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                              : task.status === 'in_progress'
+                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}>
+                            {task.status}
+                          </span>
+                        </td>
+                        <td className="p-3 w-48">
+                          <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5">
+                            <div
+                              className={`h-2.5 rounded-full ${
+                                task.status === 'done' || task.status === 'completed'
+                                  ? 'bg-emerald-500'
+                                  : task.is_blocked
+                                  ? 'bg-rose-500'
+                                  : 'bg-indigo-600'
+                              }`}
+                              style={{ width: task.status === 'done' || task.status === 'completed' ? '100%' : task.status === 'in_progress' ? '50%' : '10%' }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: PROFITABILITY & REAL-TIME FINANCIALS */}
+      {activeTab === 'profitability' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Project Audit:</span>
+              <select
+                value={activeFinId || ''}
+                onChange={(e) => setSelectedProfitabilityProjectId(Number(e.target.value))}
+                className="text-xs font-medium bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-800 dark:text-slate-200"
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code ? `[${p.code}] ` : ''}{p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {financialsData && (
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                financialsData.profit_margin_percentage >= 20
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                  : financialsData.profit_margin_percentage >= 0
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                  : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
+              }`}>
+                Margin: {financialsData.profit_margin_percentage}% ({financialsData.gross_profit >= 0 ? 'Profitable' : 'Loss-making'})
+              </span>
+            )}
+          </div>
+
+          {/* Financial Metrics Cards Strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+              <span className="text-slate-500 text-xs block">Contract Budget</span>
+              <p className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                ₹{Number(financialsData?.budget || 0).toLocaleString()}
+              </p>
+              <span className="text-[11px] text-slate-400">Baseline agreement</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+              <span className="text-slate-500 text-xs block">Invoiced Revenue</span>
+              <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                ₹{Number(financialsData?.invoiced_revenue || 0).toLocaleString()}
+              </p>
+              <span className="text-[11px] text-slate-400">Collected: ₹{Number(financialsData?.collected_revenue || 0).toLocaleString()}</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+              <span className="text-slate-500 text-xs block">Total Project Costs</span>
+              <p className="text-lg font-bold text-rose-600 dark:text-rose-400 mt-1">
+                ₹{Number(financialsData?.total_costs || 0).toLocaleString()}
+              </p>
+              <span className="text-[11px] text-slate-400">
+                Labor: ₹{Number(financialsData?.labor_costs || 0).toLocaleString()} • Exp: ₹{Number(financialsData?.actual_expenses || 0).toLocaleString()}
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+              <span className="text-slate-500 text-xs block">Net Realized Margin</span>
+              <p className={`text-lg font-bold mt-1 ${
+                (financialsData?.gross_profit || 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'
+              }`}>
+                ₹{Number(financialsData?.gross_profit || 0).toLocaleString()}
+              </p>
+              <span className="text-[11px] text-slate-400">Cost Variance: ₹{Number(financialsData?.cost_variance || 0).toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Team Workload & Labor Utilization Table */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-500" />
+                Team Workload & Capacity Utilization
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500">
+                    <th className="p-3 font-semibold">Employee</th>
+                    <th className="p-3 font-semibold">Active Tasks</th>
+                    <th className="p-3 font-semibold">Overdue Tasks</th>
+                    <th className="p-3 font-semibold">Estimated Load</th>
+                    <th className="p-3 font-semibold">Logged Hours</th>
+                    <th className="p-3 font-semibold">Capacity (40h/wk)</th>
+                    <th className="p-3 font-semibold">Utilization %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {workloadData.map((w) => (
+                    <tr key={w.user_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{w.name}</td>
+                      <td className="p-3">{w.active_tasks_count} active</td>
+                      <td className="p-3 text-rose-500 font-semibold">{w.overdue_tasks_count}</td>
+                      <td className="p-3">{w.estimated_hours}h</td>
+                      <td className="p-3">{w.logged_hours}h</td>
+                      <td className="p-3 text-slate-400">{w.capacity_hours}h</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          w.is_overloaded ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {w.utilization_percentage}% {w.is_overloaded ? '(OVERLOADED)' : ''}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: TIMESHEETS & LIVE TIMER */}
+      {activeTab === 'timesheets' && (
+        <div className="space-y-6">
+          {/* Live Timer Banner Widget */}
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-5 rounded-2xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                <Clock3 className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm">Live Workstation Timer</h3>
+                <p className="text-xs text-indigo-100">Accurately record billable employee delivery minutes in real-time.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={timerSelectedTaskId || ''}
+                onChange={(e) => setTimerSelectedTaskId(Number(e.target.value))}
+                className="text-xs bg-white text-slate-800 rounded-lg p-2 font-medium"
+              >
+                <option value="">Select Task to Clock In...</option>
+                {tasks.map((t) => (
+                  <option key={t.id} value={t.id}>#{t.id} - {t.title}</option>
+                ))}
+              </select>
+              <button
+                disabled={!timerSelectedTaskId || startTimerMutation.isPending}
+                onClick={async () => {
+                  if (timerSelectedTaskId) {
+                    await startTimerMutation.mutateAsync(timerSelectedTaskId);
+                    alert('Live timer started for task #' + timerSelectedTaskId);
+                  }
+                }}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+              >
+                <Play className="w-3.5 h-3.5" />
+                Start Timer
+              </button>
+            </div>
+          </div>
+
+          {/* Timesheets Log Table */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-indigo-500" />
+                Employee Timesheet Registry & Manager Approval Queue
+              </h3>
+              <div className="flex items-center gap-2">
+                {['all', 'pending', 'approved', 'rejected'].map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setTimesheetStatusFilter(st)}
+                    className={`px-2.5 py-1 rounded text-xs capitalize ${
+                      timesheetStatusFilter === st
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {isLoadingTimesheets ? (
+              <div className="p-8 text-center text-slate-500 text-xs">Loading timesheets...</div>
+            ) : timesheetsData.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-xs">No timesheets recorded yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500">
+                      <th className="p-3 font-semibold">User</th>
+                      <th className="p-3 font-semibold">Task</th>
+                      <th className="p-3 font-semibold">Duration</th>
+                      <th className="p-3 font-semibold">Billable</th>
+                      <th className="p-3 font-semibold">Amount</th>
+                      <th className="p-3 font-semibold">Status</th>
+                      <th className="p-3 font-semibold text-right">Manager Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {timesheetsData.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">
+                          {log.user?.name || `User #${log.user_id}`}
+                        </td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">
+                          {log.task?.title || `Task #${log.task_id}`}
+                        </td>
+                        <td className="p-3">
+                          {log.is_running ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-700 font-bold animate-pulse">
+                              RUNNING
+                            </span>
+                          ) : (
+                            <span>{Math.floor((log.duration_minutes || 0) / 60)}h {(log.duration_minutes || 0) % 60}m</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] ${
+                            log.is_billable ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {log.is_billable ? 'Billable' : 'Non-billable'}
+                          </span>
+                        </td>
+                        <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">
+                          ₹{Number(log.billable_amount || 0).toLocaleString()}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                            log.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                            log.status === 'rejected' ? 'bg-rose-100 text-rose-700' :
+                            'bg-amber-100 text-amber-700'
+                          }`}>
+                            {log.status || 'pending'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {log.is_running ? (
+                              <button
+                                onClick={async () => {
+                                  await stopTimerMutation.mutateAsync({ logId: log.id, description: 'Stopped by user' });
+                                }}
+                                className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-[10px] font-bold flex items-center gap-1"
+                              >
+                                <Square className="w-3 h-3" />
+                                Stop
+                              </button>
+                            ) : log.status === 'pending' ? (
+                              <>
+                                <button
+                                  onClick={async () => {
+                                    await approveTimeLogMutation.mutateAsync(log.id);
+                                  }}
+                                  className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-950/40 text-emerald-600 rounded transition"
+                                  title="Approve Timesheet"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    const reason = prompt('Enter rejection reason:') || 'Hours unverified';
+                                    await rejectTimeLogMutation.mutateAsync({ logId: log.id, reason });
+                                  }}
+                                  className="p-1 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-rose-600 rounded transition"
+                                  title="Reject Timesheet"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-slate-400 text-[10px]">Reviewed</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

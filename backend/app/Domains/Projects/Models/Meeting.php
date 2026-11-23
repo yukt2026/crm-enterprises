@@ -28,6 +28,16 @@ class Meeting extends Model
         'company_id',
         'deal_id',
         'project_id',
+        'branch_id',
+        'customer_id',
+        'service_id',
+        'booking_reference',
+        'payment_status',
+        'booking_fee',
+        'cancellation_reason',
+        'cancelled_at',
+        'rescheduled_at',
+        'is_customer_booked',
         'title',
         'description',
         'agenda',
@@ -46,9 +56,23 @@ class Meeting extends Model
 
     protected $casts = [
         'meeting_date' => 'date',
+        'is_customer_booked' => 'boolean',
+        'booking_fee' => 'float',
+        'cancelled_at' => 'datetime',
+        'rescheduled_at' => 'datetime',
     ];
 
     // --- RELATIONSHIPS ---
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CRM\Models\Customer::class, 'customer_id');
+    }
+
+    public function service(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CustomerPortal\Models\BookableService::class, 'service_id');
+    }
 
     public function organizer(): BelongsTo
     {
@@ -78,6 +102,11 @@ class Meeting extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CRM\Models\Branch::class, 'branch_id');
     }
 
     public function attendees(): HasMany

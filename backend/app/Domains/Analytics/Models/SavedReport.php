@@ -18,21 +18,29 @@ class SavedReport extends Model
         'title',
         'description',
         'report_type', // executive, leads, sales, marketing, attribution, operations, communications
+        'module',
+        'group_by',
+        'sort_by',
+        'sort_direction',
         'filters',
         'selected_columns',
+        'aggregations',
         'chart_type',
         'is_scheduled',
         'schedule_frequency',
         'schedule_recipients',
         'last_run_at',
+        'exported_at',
     ];
 
     protected $casts = [
         'filters' => 'array',
         'selected_columns' => 'array',
+        'aggregations' => 'array',
         'schedule_recipients' => 'array',
         'is_scheduled' => 'boolean',
         'last_run_at' => 'datetime',
+        'exported_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

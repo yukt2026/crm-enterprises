@@ -118,18 +118,25 @@ class WorkflowRunController extends Controller
 
     public function triggerManual(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->tenant_id;
+        $tenantId = (int) ($request->user()->current_tenant_id ?? $request->user()->tenant_id);
+
+        if ($request->filled('workflow_id') && !$request->filled('trigger_type')) {
+            $wf = Workflow::where('tenant_id', $tenantId)->find($request->workflow_id);
+            if ($wf) {
+                $request->merge(['trigger_type' => $wf->trigger_type]);
+            }
+        }
 
         $validated = $request->validate([
             'trigger_type' => 'required|string',
-            'payload' => 'required|array',
+            'payload' => 'nullable|array',
             'idempotency_key' => 'nullable|string',
         ]);
 
         $result = $this->engine->trigger(
             $tenantId,
             $validated['trigger_type'],
-            $validated['payload'],
+            $validated['payload'] ?? [],
             $validated['idempotency_key'] ?? null
         );
 

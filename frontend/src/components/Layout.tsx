@@ -53,9 +53,11 @@ import {
   Plug,
   Wallet,
   Receipt,
+  Sparkles,
   X
 } from 'lucide-react';
 import { useUnreadNotificationCount } from '../hooks/useSharedServices';
+import { IndustryTemplatesModal } from './platform/IndustryTemplatesModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -88,6 +90,7 @@ export default function Layout({ children, activeModule, setActiveModule }: Layo
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false);
   const [createWorkspaceModalOpen, setCreateWorkspaceModalOpen] = useState(false);
+  const [industryTemplatesModalOpen, setIndustryTemplatesModalOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [newWorkspaceTier, setNewWorkspaceTier] = useState('enterprise');
   const [isSubmittingWorkspace, setIsSubmittingWorkspace] = useState(false);
@@ -399,7 +402,17 @@ export default function Layout({ children, activeModule, setActiveModule }: Layo
                     })}
                   </div>
 
-                  <div className="pt-2 mt-2 border-t border-inherit">
+                  <div className="pt-2 mt-2 border-t border-inherit space-y-1.5">
+                    <button
+                      onClick={() => {
+                        setWorkspaceDropdownOpen(false);
+                        setIndustryTemplatesModalOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Industry Templates</span>
+                    </button>
                     <button
                       onClick={() => {
                         setWorkspaceDropdownOpen(false);
@@ -646,6 +659,12 @@ export default function Layout({ children, activeModule, setActiveModule }: Layo
         isOpen={notifOpen}
         onClose={() => setNotifOpen(false)}
         theme={theme}
+      />
+
+      {/* INDUSTRY TEMPLATES MODAL */}
+      <IndustryTemplatesModal
+        isOpen={industryTemplatesModalOpen}
+        onClose={() => setIndustryTemplatesModalOpen(false)}
       />
 
       {/* TOAST SYSTEM VIEWPORTS */}

@@ -90,14 +90,17 @@ class Task extends Model
 
     public function assignees(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'task_assignees', 'task_id', 'user_id')
-            ->withPivot('role')
-            ->withTimestamps();
+        return $this->belongsToMany(User::class, 'task_assignees', 'task_id', 'user_id');
     }
 
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->assignedUser();
     }
 
     public function creator(): BelongsTo

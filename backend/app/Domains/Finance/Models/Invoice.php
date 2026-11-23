@@ -21,6 +21,8 @@ class Invoice extends Model
 
     protected $fillable = [
         'tenant_id',
+        'branch_id',
+        'project_id',
         'invoice_number',
         'quotation_id',
         'deal_id',
@@ -158,6 +160,11 @@ class Invoice extends Model
     public function deal(): BelongsTo
     {
         return $this->belongsTo(Deal::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CRM\Models\Branch::class, 'branch_id');
     }
 
     public function customer(): BelongsTo

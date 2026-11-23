@@ -31,7 +31,22 @@ import {
   Terminal,
   ShieldCheck,
   Zap,
+  Sparkles,
+  Download,
+  Database,
+  Send,
+  HardDrive,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
+import {
+  usePlatformAnnouncements,
+  useCreatePlatformAnnouncement,
+  usePlatformBackups,
+  useTriggerPlatformBackup,
+  useIndustryTemplates,
+  usePlatformRevenueReport,
+} from '../../hooks/useSaasPlatform';
 import {
   usePlatformOverview,
   usePlatformTenants,
@@ -61,7 +76,7 @@ import {
 import { PlatformTenantItem, PlatformProviderItem, SubscriptionPlanItem } from '../../api/types';
 
 export const PlatformSuperAdminConsoleView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'tenants' | 'billing' | 'providers' | 'system'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tenants' | 'billing' | 'providers' | 'system' | 'templates' | 'announcements' | 'backups'>('overview');
 
   // Modals & Drawers state
   const [selectedTenantId, setSelectedTenantId] = useState<number | null>(null);
@@ -103,6 +118,17 @@ export const PlatformSuperAdminConsoleView: React.FC = () => {
   const [adjustAmount, setAdjustAmount] = useState<number>(50);
   const [adjustReason, setAdjustReason] = useState<string>('');
 
+  // Prompt 50 Super Admin state
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '',
+    message: '',
+    type: 'info' as 'info' | 'warning' | 'critical' | 'release',
+    target_audience: 'all' as 'all' | 'specific_tenants' | 'admins_only',
+    action_url: '',
+  });
+  const [backupNotes, setBackupNotes] = useState<string>('');
+  const [backupType, setBackupType] = useState<string>('full');
+
   // Search & filter state
   const [tenantSearch, setTenantSearch] = useState<string>('');
   const [tenantStatusFilter, setTenantStatusFilter] = useState<string>('');
@@ -122,6 +148,15 @@ export const PlatformSuperAdminConsoleView: React.FC = () => {
   const { data: featureFlags = [] } = usePlatformFeatureFlags();
   const { data: maintenanceMode } = usePlatformMaintenanceMode();
   const { data: auditLogsData } = usePlatformAuditLogs({ per_page: 30 });
+
+  // Prompt 50 SaaS Queries & Mutations
+  const { data: industryTemplates = [] } = useIndustryTemplates();
+  const { data: announcementsData = [], refetch: refetchAnnouncements } = usePlatformAnnouncements();
+  const { data: backupsData = [], refetch: refetchBackups } = usePlatformBackups();
+  const { data: saasRevenueData } = usePlatformRevenueReport();
+
+  const createAnnouncementMutation = useCreatePlatformAnnouncement();
+  const triggerBackupMutation = useTriggerPlatformBackup();
 
   // Mutations
   const updateStatusMutation = useUpdatePlatformTenantStatus();
@@ -282,13 +317,16 @@ export const PlatformSuperAdminConsoleView: React.FC = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 space-x-1">
+      <div className="flex border-b border-slate-800 space-x-1 overflow-x-auto">
         {[
           { id: 'overview', label: 'Platform Telemetry', icon: Activity },
           { id: 'tenants', label: 'Tenants Directory', icon: Building2 },
-          { id: 'billing', label: 'Plans & Commercial Billing', icon: CreditCard },
-          { id: 'providers', label: 'AI & Telephony Providers', icon: Cpu },
-          { id: 'system', label: 'System & Security Operations', icon: Server },
+          { id: 'billing', label: 'Plans & GST Billing', icon: CreditCard },
+          { id: 'templates', label: 'Industry Blueprints', icon: Sparkles },
+          { id: 'announcements', label: 'Announcements', icon: Radio },
+          { id: 'backups', label: 'Backups & DR', icon: HardDrive },
+          { id: 'providers', label: 'AI & Telephony', icon: Cpu },
+          { id: 'system', label: 'Security & Ops', icon: Server },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -876,6 +914,338 @@ export const PlatformSuperAdminConsoleView: React.FC = () => {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: Industry Templates Management */}
+      {activeTab === 'templates' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-indigo-400" />
+                  Industry-Specific SaaS Blueprints ({industryTemplates.length} Verticals)
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Ready-to-deploy domain templates with pre-configured pipeline stages, domain fields, and automations for Indian businesses.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {industryTemplates.map((template) => (
+                <div
+                  key={template.template_code}
+                  className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 hover:border-slate-600 transition space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 uppercase tracking-wider">
+                        {template.industry_sector}
+                      </span>
+                      <h4 className="text-base font-bold text-white mt-1.5">{template.name}</h4>
+                    </div>
+                    <span className="text-xs font-mono text-slate-400">v{template.version}</span>
+                  </div>
+
+                  <p className="text-xs text-slate-400 line-clamp-2">{template.description}</p>
+
+                  <div className="pt-2 border-t border-slate-700/40 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-slate-900/60 p-2 rounded-lg">
+                      <div className="font-bold text-white">{template.pipeline_stages?.length || 0}</div>
+                      <div className="text-[10px] text-slate-400">Stages</div>
+                    </div>
+                    <div className="bg-slate-900/60 p-2 rounded-lg">
+                      <div className="font-bold text-white">{template.custom_fields?.length || 0}</div>
+                      <div className="text-[10px] text-slate-400">Fields</div>
+                    </div>
+                    <div className="bg-slate-900/60 p-2 rounded-lg">
+                      <div className="font-bold text-white">{template.dashboard_widgets?.length || 0}</div>
+                      <div className="text-[10px] text-slate-400">Widgets</div>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 space-y-1">
+                    <div className="font-medium text-slate-300">Pipeline Stages:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {template.pipeline_stages?.slice(0, 4).map((s, i) => (
+                        <span key={i} className="px-1.5 py-0.5 bg-slate-900/80 rounded text-[10px] text-slate-300">
+                          {s.name}
+                        </span>
+                      ))}
+                      {(template.pipeline_stages?.length || 0) > 4 && (
+                        <span className="px-1.5 py-0.5 bg-slate-900/80 rounded text-[10px] text-indigo-400">
+                          +{(template.pipeline_stages?.length || 0) - 4} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: Platform Announcements */}
+      {activeTab === 'announcements' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Create Announcement Form */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Radio className="w-5 h-5 text-red-400" />
+                Dispatch Platform Broadcast
+              </h3>
+              <p className="text-xs text-slate-400">
+                Broadcast operational alerts, scheduled maintenance notices, or new release highlights to active tenants.
+              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Announcement Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Scheduled GST Portal Maintenance"
+                  value={newAnnouncement.title}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Message Content</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Detailed notification message shown to tenants..."
+                  value={newAnnouncement.message}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, message: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Severity / Type</label>
+                  <select
+                    value={newAnnouncement.type}
+                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, type: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none"
+                  >
+                    <option value="info">Info</option>
+                    <option value="warning">Warning</option>
+                    <option value="critical">Critical</option>
+                    <option value="release">Release Update</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Target Audience</label>
+                  <select
+                    value={newAnnouncement.target_audience}
+                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, target_audience: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none"
+                  >
+                    <option value="all">All Tenants</option>
+                    <option value="admins_only">Tenant Admins Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Action URL (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="https://..."
+                  value={newAnnouncement.action_url}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, action_url: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none"
+                />
+              </div>
+
+              <button
+                onClick={async () => {
+                  if (!newAnnouncement.title || !newAnnouncement.message) return;
+                  await createAnnouncementMutation.mutateAsync(newAnnouncement);
+                  setNewAnnouncement({ title: '', message: '', type: 'info', target_audience: 'all', action_url: '' });
+                  refetchAnnouncements();
+                }}
+                disabled={createAnnouncementMutation.isPending || !newAnnouncement.title || !newAnnouncement.message}
+                className="w-full py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                {createAnnouncementMutation.isPending ? 'Broadcasting...' : 'Broadcast to Platform'}
+              </button>
+            </div>
+
+            {/* Recent Announcements List */}
+            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h3 className="text-base font-bold text-white mb-4">Published Platform Announcements</h3>
+              <div className="space-y-3">
+                {announcementsData.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500 text-xs">
+                    No active platform announcements.
+                  </div>
+                ) : (
+                  announcementsData.map((ann) => (
+                    <div
+                      key={ann.id}
+                      className="p-4 bg-slate-800/60 border border-slate-700/60 rounded-xl space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              ann.type === 'critical'
+                                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                : ann.type === 'warning'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : ann.type === 'release'
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                            }`}
+                          >
+                            {ann.type}
+                          </span>
+                          <h4 className="text-sm font-bold text-white">{ann.title}</h4>
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          {new Date(ann.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300">{ann.message}</p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                        <span>Target: {ann.target_audience.replace('_', ' ')}</span>
+                        {ann.action_url && (
+                          <a
+                            href={ann.action_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-400 hover:underline flex items-center gap-1"
+                          >
+                            <span>Learn more</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 8: Encrypted Automated Backups & Disaster Recovery */}
+      {activeTab === 'backups' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <HardDrive className="w-5 h-5 text-emerald-400" />
+                  Automated Encrypted Backups & Disaster Recovery
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  SHA-256 verified snapshots with AES-256 encryption at rest. Point-in-time recovery for cross-tenant resilience.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <select
+                  value={backupType}
+                  onChange={(e) => setBackupType(e.target.value)}
+                  className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none"
+                >
+                  <option value="full">Full Platform Snapshot</option>
+                  <option value="tenant_data_only">Tenant Data Only</option>
+                  <option value="schema_only">Schema Only</option>
+                </select>
+
+                <button
+                  onClick={async () => {
+                    await triggerBackupMutation.mutateAsync({ backup_type: backupType, notes: backupNotes });
+                    refetchBackups();
+                  }}
+                  disabled={triggerBackupMutation.isPending}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow"
+                >
+                  <Database className="w-4 h-4" />
+                  {triggerBackupMutation.isPending ? 'Generating Snapshot...' : 'Trigger Backup Now'}
+                </button>
+              </div>
+            </div>
+
+            {/* Backups Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-800/60 text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <th className="px-4 py-3">Timestamp</th>
+                    <th className="px-4 py-3">Snapshot File</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Size</th>
+                    <th className="px-4 py-3">SHA-256 Checksum</th>
+                    <th className="px-4 py-3">Encryption</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {backupsData.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-slate-500">
+                        No backup archives found. Trigger a backup to create the initial snapshot.
+                      </td>
+                    </tr>
+                  ) : (
+                    backupsData.map((backup) => (
+                      <tr key={backup.id} className="hover:bg-slate-800/30">
+                        <td className="px-4 py-3 text-slate-400">
+                          {new Date(backup.created_at).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-medium text-white">
+                          {backup.file_name}
+                        </td>
+                        <td className="px-4 py-3 capitalize text-slate-300">
+                          {backup.backup_type}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-white">
+                          {backup.size_formatted}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-[10px] text-slate-400 truncate max-w-xs" title={backup.checksum_sha256 || ''}>
+                          {backup.checksum_sha256 ? `${backup.checksum_sha256.substring(0, 16)}...` : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {backup.encryption_enabled ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              AES-256
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">Disabled</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              backup.status === 'completed'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : backup.status === 'in_progress'
+                                ? 'bg-blue-500/20 text-blue-400 animate-pulse'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}
+                          >
+                            {backup.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

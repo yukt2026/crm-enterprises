@@ -51,6 +51,7 @@ class RbacService
         'branches' => 'Branches & Locations',
         'customer_portal' => 'Customer Portal & Appointments',
         'gst' => 'GST & Business Compliance',
+        'field_sales' => 'Field Sales & Visit Planner',
         'settings' => 'System & Workspace Settings',
         'roles' => 'Roles & Permissions',
     ];
@@ -90,6 +91,37 @@ class RbacService
         'manage_ai_agents' => 'Create & Manage AI Voice Agents',
         'manage_phone_numbers' => 'Manage Telephony Phone Numbers',
         'manage_ivr' => 'Manage IVR Flows & Queues',
+        'manage_branches' => 'Manage Branches & Outlets',
+        'view_own' => 'View Own Assigned Branch',
+        'view_all' => 'View All Authorized Branches',
+        'deactivate' => 'Deactivate Branch Records',
+        'assign_employees' => 'Assign Staff to Branch',
+        'transfer_records' => 'Transfer Records Across Branches',
+        'view_consolidated_reports' => 'View Consolidated Multi-Branch Reports',
+        'adjust_stock' => 'Adjust Warehouse Stock Levels',
+        'transfer_stock' => 'Transfer Stock Between Warehouses',
+        'approve_transfers' => 'Approve Stock Transfers',
+        'view_vendor_bank_details' => 'View Sensitive Vendor Bank Details',
+        'view_purchase_costs' => 'View Purchase & Product Cost Prices',
+        'manage_returns' => 'Manage Customer Returns & Restocking',
+        'test_workflows' => 'Test & Simulate Automation Workflows',
+        'publish_workflows' => 'Publish & Activate Workflows',
+        'pause_workflows' => 'Pause Active Workflows',
+        'approve_automation' => 'Approve Human Workflow Actions',
+        'view_execution_logs' => 'View Workflow Execution Logs',
+        'manage_automation_limits' => 'Manage Organization Automation Limits',
+        'view_dashboard' => 'View Analytics Dashboard',
+        'configure_dashboard' => 'Configure Dashboard & Widgets',
+        'view_sales_reports' => 'View Sales Analytics & Reports',
+        'view_finance_reports' => 'View Finance Analytics & Reports',
+        'view_employee_reports' => 'View Employee Analytics & Reports',
+        'view_branch_reports' => 'View Branch Analytics & Reports',
+        'export_reports' => 'Export Analytics & Custom Reports',
+        'generate_ai_insights' => 'Generate AI Business Insights',
+        'manage_alerts' => 'Configure Custom Analytics Alerts',
+        'access_field_sales' => 'Access Field Sales Tracker',
+        'access_location_info' => 'Access GPS Location Information',
+        'manage_report_schedules' => 'Manage Scheduled Report Deliveries',
     ];
 
     /**
@@ -98,6 +130,7 @@ class RbacService
     public const DATA_SCOPES = [
         'all' => 'All Organization Records',
         'branch' => 'Branch Records Only',
+        'warehouse' => 'Warehouse Records Only',
         'department' => 'Department Records Only',
         'team' => 'Team Records Only',
         'assigned' => 'Assigned Records Only',
@@ -166,7 +199,8 @@ class RbacService
      */
     public function isOrganizationOwner(User $user, ?int $tenantId): bool
     {
-        if ($user->role === 'Business Owner' || $user->role === 'Organization Owner') {
+        $roleName = strtolower($user->role ?? '');
+        if (in_array($roleName, ['business owner', 'organization owner', 'business admin', 'admin', 'owner'])) {
             return true;
         }
 
@@ -852,6 +886,11 @@ class RbacService
                     ['module' => 'attendance', 'action' => '*', 'data_scope' => 'branch'],
                     ['module' => 'hrm', 'action' => 'view', 'data_scope' => 'branch'],
                     ['module' => 'analytics', 'action' => 'view', 'data_scope' => 'branch'],
+                    ['module' => 'branches', 'action' => 'view_own', 'data_scope' => 'branch'],
+                    ['module' => 'branches', 'action' => 'view_reports', 'data_scope' => 'branch'],
+                    ['module' => 'branches', 'action' => 'transfer_records', 'data_scope' => 'branch'],
+                    ['module' => 'branches', 'action' => 'edit', 'data_scope' => 'branch'],
+                    ['module' => 'branches', 'action' => 'manage_settings', 'data_scope' => 'branch'],
                 ],
             ],
             'dept_manager' => [

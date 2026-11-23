@@ -23,10 +23,23 @@ class Tenant extends Model
         'subscription_tier',
         'status',
         'settings',
+        'timezone',
+        'branding',
+        'onboarding_status',
+        'onboarding_step',
+        'industry_template_code',
+        'suspended_at',
+        'suspension_reason',
+        'gstin',
+        'pan',
+        'billing_address',
+        'billing_state_code',
     ];
 
     protected $casts = [
         'settings' => 'array',
+        'branding' => 'array',
+        'suspended_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -81,5 +94,10 @@ class Tenant extends Model
     public function costProtectionRule(): HasOne
     {
         return $this->hasOne(\App\Domains\Billing\Models\TenantCostProtectionRule::class);
+    }
+
+    public function appliedTemplates(): HasMany
+    {
+        return $this->hasMany(\App\Domains\PlatformAdmin\Models\TenantAppliedTemplate::class);
     }
 }

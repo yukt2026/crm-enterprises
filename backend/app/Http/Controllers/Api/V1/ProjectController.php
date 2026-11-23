@@ -30,7 +30,7 @@ class ProjectController extends Controller
         $tenantId = $this->getTenantId();
 
         $query = Project::where('tenant_id', $tenantId)
-            ->with(['customer', 'company', 'owner', 'teamMembers'])
+            ->with(['customer', 'company', 'owner', 'manager', 'teamMembers'])
             ->withCount(['tasks', 'milestones']);
 
         if ($request->boolean('archived')) {
@@ -47,6 +47,10 @@ class ProjectController extends Controller
             $query->where('priority', $request->priority);
         }
 
+        if ($request->filled('branch_id')) {
+            $query->where('branch_id', $request->branch_id);
+        }
+
         if ($request->filled('customer_id')) {
             $query->where('customer_id', $request->customer_id);
         }
@@ -55,13 +59,22 @@ class ProjectController extends Controller
             $query->where('company_id', $request->company_id);
         }
 
+        if ($request->filled('manager_user_id')) {
+            $query->where('manager_user_id', $request->manager_user_id);
+        }
+
         if ($request->filled('owner_id')) {
             $query->where('owner_id', $request->owner_id);
+        }
+
+        if ($request->filled('deal_id')) {
+            $query->where('deal_id', $request->deal_id);
         }
 
         if ($request->filled('q')) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'like', '%' . $request->q . '%')
+                  ->orWhere('code', 'like', '%' . $request->q . '%')
                   ->orWhere('description', 'like', '%' . $request->q . '%');
             });
         }
@@ -78,17 +91,26 @@ class ProjectController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'code' => 'nullable|string|max:50',
             'description' => 'nullable|string',
+            'notes' => 'nullable|string',
             'customer_id' => 'nullable|exists:customers,id',
             'company_id' => 'nullable|exists:companies,id',
+            'deal_id' => 'nullable|exists:deals,id',
+            'quotation_id' => 'nullable|exists:quotations,id',
+            'branch_id' => 'nullable|exists:branches,id',
             'owner_id' => 'nullable|exists:users,id',
-            'status' => 'nullable|string|in:not_started,in_progress,on_hold,completed,cancelled',
+            'manager_user_id' => 'nullable|exists:users,id',
+            'status' => 'nullable|string|in:draft,planned,active,not_started,in_progress,on_hold,at_risk,completed,cancelled,archived',
             'priority' => 'nullable|string|in:low,medium,high,urgent',
             'budget' => 'nullable|numeric|min:0',
+            'labor_cost_rate' => 'nullable|numeric|min:0',
+            'billing_rate' => 'nullable|numeric|min:0',
             'estimated_hours' => 'nullable|integer|min:0',
             'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'end_date' => 'nullable|date',
             'progress' => 'nullable|integer|between:0,100',
+            'client_portal_enabled' => 'nullable|boolean',
             'team_members' => 'nullable|array',
             'milestones' => 'nullable|array',
         ]);
@@ -96,6 +118,44 @@ class ProjectController extends Controller
         $project = $this->projectService->createProject($validated, $tenantId, auth()->id());
 
         return $this->successResponse($project, 'Project created successfully.', 201);
+    }
+
+    public function createFromDeal(Request $request): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+
+        $validated = $request->validate([
+            'deal_id' => 'required|exists:deals,id',
+            'name' => 'nullable|string|max:255',
+            'budget' => 'nullable|numeric|min:0',
+            'manager_user_id' => 'nullable|exists:users,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+        ]);
+
+        $overrides = array_filter($validated, fn($key) => $key !== 'deal_id', ARRAY_FILTER_USE_KEY);
+        $project = $this->projectService->createProjectFromDeal((int) $validated['deal_id'], $overrides, $tenantId, auth()->id() ?? 1);
+
+        return $this->successResponse($project, 'Project created from deal successfully.', 201);
+    }
+
+    public function createFromQuotation(Request $request): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+
+        $validated = $request->validate([
+            'quotation_id' => 'required|exists:quotations,id',
+            'name' => 'nullable|string|max:255',
+            'budget' => 'nullable|numeric|min:0',
+            'manager_user_id' => 'nullable|exists:users,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+        ]);
+
+        $overrides = array_filter($validated, fn($key) => $key !== 'quotation_id', ARRAY_FILTER_USE_KEY);
+        $project = $this->projectService->createProjectFromQuotation((int) $validated['quotation_id'], $overrides, $tenantId, auth()->id() ?? 1);
+
+        return $this->successResponse($project, 'Project created from quotation successfully.', 201);
     }
 
     public function show(int $id): JsonResponse
@@ -106,10 +166,15 @@ class ProjectController extends Controller
                 'customer',
                 'company',
                 'owner',
+                'manager',
                 'teamMembers',
-                'milestones',
+                'milestones.approvalLogs',
+                'documents.uploadedByUser',
+                'statusHistories.changedByUser',
                 'comments.user',
                 'tasks.assignedUser',
+                'tasks.subtasks',
+                'tasks.assignees',
                 'meetings',
             ])
             ->findOrFail($id);
@@ -124,23 +189,82 @@ class ProjectController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
+            'code' => 'nullable|string|max:50',
             'description' => 'nullable|string',
+            'notes' => 'nullable|string',
             'customer_id' => 'nullable|exists:customers,id',
             'company_id' => 'nullable|exists:companies,id',
+            'deal_id' => 'nullable|exists:deals,id',
+            'quotation_id' => 'nullable|exists:quotations,id',
+            'branch_id' => 'nullable|exists:branches,id',
             'owner_id' => 'nullable|exists:users,id',
-            'status' => 'sometimes|string|in:not_started,in_progress,on_hold,completed,cancelled',
+            'manager_user_id' => 'nullable|exists:users,id',
+            'status' => 'sometimes|string|in:draft,planned,active,not_started,in_progress,on_hold,at_risk,completed,cancelled,archived',
             'priority' => 'sometimes|string|in:low,medium,high,urgent',
             'budget' => 'nullable|numeric|min:0',
+            'labor_cost_rate' => 'nullable|numeric|min:0',
+            'billing_rate' => 'nullable|numeric|min:0',
             'estimated_hours' => 'nullable|integer|min:0',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
             'progress' => 'nullable|integer|between:0,100',
+            'client_portal_enabled' => 'nullable|boolean',
             'team_members' => 'nullable|array',
         ]);
 
         $project = $this->projectService->updateProject($project, $validated);
 
         return $this->successResponse($project, 'Project updated successfully.');
+    }
+
+    public function transitionStatus(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $project = Project::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $validated = $request->validate([
+            'status' => 'required|string|in:draft,planned,active,on_hold,at_risk,completed,cancelled,archived',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $project = $this->projectService->transitionProjectStatus(
+            $project,
+            $validated['status'],
+            auth()->id() ?? 1,
+            $validated['reason'] ?? null
+        );
+
+        return $this->successResponse($project->load('statusHistories.changedByUser'), 'Project status transitioned successfully.');
+    }
+
+    public function financials(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $project = Project::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $financials = $this->projectService->getFinancials($project);
+
+        return $this->successResponse($financials);
+    }
+
+    public function gantt(int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $project = Project::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $gantt = $this->projectService->getGanttData($project);
+
+        return $this->successResponse($gantt);
+    }
+
+    public function workload(Request $request): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $branchId = $request->filled('branch_id') ? (int) $request->branch_id : null;
+
+        $report = $this->projectService->getWorkloadReport($tenantId, $branchId);
+
+        return $this->successResponse($report);
     }
 
     public function destroy(int $id): JsonResponse
@@ -177,7 +301,7 @@ class ProjectController extends Controller
         $tenantId = $this->getTenantId();
         $project = Project::where('tenant_id', $tenantId)->findOrFail($id);
 
-        return $this->successResponse($project->milestones);
+        return $this->successResponse($project->milestones()->with('approvalLogs')->orderBy('order_index')->get());
     }
 
     public function storeMilestone(Request $request, int $id): JsonResponse
@@ -189,6 +313,10 @@ class ProjectController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'due_date' => 'nullable|date',
+            'amount' => 'nullable|numeric|min:0',
+            'billing_percentage' => 'nullable|numeric|min:0|max:100',
+            'deliverables_summary' => 'nullable|string',
+            'approval_status' => 'nullable|string',
             'status' => 'nullable|in:pending,in_progress,completed',
             'progress' => 'nullable|integer|between:0,100',
         ]);
@@ -209,6 +337,10 @@ class ProjectController extends Controller
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
             'due_date' => 'nullable|date',
+            'amount' => 'nullable|numeric|min:0',
+            'billing_percentage' => 'nullable|numeric|min:0|max:100',
+            'deliverables_summary' => 'nullable|string',
+            'approval_status' => 'sometimes|string',
             'status' => 'sometimes|in:pending,in_progress,completed',
             'progress' => 'sometimes|integer|between:0,100',
         ]);

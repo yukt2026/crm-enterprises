@@ -21,6 +21,16 @@ class ResolveActiveTenant
         }
 
         $user = Auth::user();
+
+        // Customer portal account authentication handling
+        if ($user instanceof \App\Domains\CustomerPortal\Models\CustomerAccount) {
+            $tenant = Tenant::find($user->tenant_id);
+            if ($tenant) {
+                TenantContext::setTenant($tenant);
+            }
+            return $next($request);
+        }
+
         $isPlatformAdmin = (bool) ($user->is_platform_admin || $user->hasRole('Platform Super Admin'));
         TenantContext::setPlatformAdmin($isPlatformAdmin);
 

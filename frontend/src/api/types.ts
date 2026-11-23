@@ -585,6 +585,9 @@ export interface TaskItem {
   id: number;
   title: string;
   description?: string | null;
+  project_id?: number | null;
+  parent_task_id?: number | null;
+  milestone_id?: number | null;
   assigned_user_id?: number | null;
   created_by?: number | null;
   lead_id?: number | null;
@@ -593,22 +596,31 @@ export interface TaskItem {
   deal_id?: number | null;
   ticket_id?: number | null;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'todo' | 'in_progress' | 'done' | 'cancelled';
+  status: 'todo' | 'in_progress' | 'in_review' | 'completed' | 'done' | 'cancelled';
   start_date?: string | null;
   due_date?: string | null;
+  estimated_hours?: number;
   reminder_at?: string | null;
   is_recurring: boolean;
   recurring_rule?: 'daily' | 'weekly' | 'monthly' | null;
   checklist_items?: TaskChecklistItem[] | null;
+  labels?: string[] | null;
+  is_blocked?: boolean;
+  block_reason?: string | null;
+  order_index?: number;
   completed_at?: string | null;
   cancelled_at?: string | null;
   created_at: string;
   assigned_user?: { id: number; name: string; email?: string } | null;
+  assignees?: Array<{ id: number; name: string; email?: string }>;
   creator?: { id: number; name: string; email?: string } | null;
   deal?: { id: number; name: string; value: number } | null;
   lead?: { id: number; name: string } | null;
   contact?: { id: number; name: string } | null;
   company?: { id: number; name: string } | null;
+  project?: { id: number; name: string } | null;
+  milestone?: { id: number; title: string } | null;
+  subtasks?: TaskItem[];
 }
 
 export interface SalesTeamItem {
@@ -684,6 +696,8 @@ export interface ProductVariantItem {
 
 export interface WarehouseItem {
   id: number;
+  branch_id?: number | null;
+  manager_id?: number | null;
   name: string;
   code: string;
   contact_name?: string | null;
@@ -693,9 +707,13 @@ export interface WarehouseItem {
   city?: string | null;
   state?: string | null;
   country?: string | null;
+  capacity_sqft?: number | null;
+  capacity_units?: number | null;
   is_primary: boolean;
   is_active: boolean;
   stocks_count?: number;
+  manager?: { id: number; name: string; email: string } | null;
+  branch?: { id: number; name: string; branch_code: string } | null;
 }
 
 export interface ProductStockItem {
@@ -705,9 +723,12 @@ export interface ProductStockItem {
   warehouse_id: number;
   current_stock: number;
   reserved_stock: number;
+  incoming_stock?: number;
   available_stock: number;
   minimum_stock: number;
   damaged_stock: number;
+  returned_stock?: number;
+  reorder_level?: number;
   product?: ProductCatalogItem | null;
   warehouse?: WarehouseItem | null;
   variant?: ProductVariantItem | null;
@@ -722,13 +743,19 @@ export interface ProductCatalogItem {
   category?: string | null;
   brand?: string | null;
   unit: string;
+  secondary_unit?: string | null;
+  unit_conversion_factor?: number;
   price: number;
+  min_selling_price?: number | null;
   cost_price: number;
   tax_rate: number;
   hsn_sac_code?: string | null;
   barcode?: string | null;
   track_inventory: boolean;
   allow_negative_stock: boolean;
+  is_archived?: boolean;
+  reorder_level?: number;
+  reorder_quantity?: number;
   service_duration?: string | null;
   service_delivery_type?: string | null;
   image_url?: string | null;
@@ -740,6 +767,20 @@ export interface ProductCatalogItem {
   stocks?: ProductStockItem[];
   variants?: ProductVariantItem[];
   created_at?: string;
+}
+
+export interface InventorySettingItem {
+  id: number;
+  tenant_id: number;
+  is_inventory_enabled: boolean;
+  valuation_method: 'moving_average' | 'fifo' | 'standard';
+  default_warehouse_id?: number | null;
+  allow_negative_stock: boolean;
+  auto_reserve_on_order: boolean;
+  auto_deduct_on_invoice: boolean;
+  low_stock_notification: boolean;
+  default_reorder_lead_days: number;
+  default_warehouse?: WarehouseItem | null;
 }
 
 export interface StockMovementItem {
@@ -775,11 +816,53 @@ export interface SupplierItem {
   city?: string | null;
   country?: string | null;
   tax_id?: string | null;
+  pan_number?: string | null;
+  gstin?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  masked_bank_account?: string | null;
+  bank_ifsc?: string | null;
+  bank_branch?: string | null;
+  products_supplied?: string[] | null;
+  outstanding_balance?: number;
+  vendor_rating?: number;
+  documents?: any[] | null;
   payment_terms: string;
   currency: string;
   status: 'active' | 'inactive';
   notes?: string | null;
   purchase_orders_count?: number;
+}
+
+export interface PurchaseRequestItemLine {
+  id?: number;
+  purchase_request_id?: number;
+  product_id: number;
+  product_variant_id?: number | null;
+  quantity: number;
+  estimated_unit_cost?: number;
+  total_cost?: number;
+  notes?: string | null;
+  product?: ProductCatalogItem | null;
+}
+
+export interface PurchaseRequestRecord {
+  id: number;
+  pr_number: string;
+  requested_by: number;
+  department_id?: number | null;
+  warehouse_id: number;
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'ordered';
+  approved_by?: number | null;
+  approved_at?: string | null;
+  rejection_reason?: string | null;
+  total_estimated_amount: number;
+  notes?: string | null;
+  requester?: { id: number; name: string; email: string } | null;
+  approver?: { id: number; name: string; email: string } | null;
+  warehouse?: WarehouseItem | null;
+  items?: PurchaseRequestItemLine[];
+  created_at: string;
 }
 
 export interface PurchaseOrderItem {
@@ -798,21 +881,147 @@ export interface PurchaseOrderItem {
 export interface PurchaseOrderRecord {
   id: number;
   po_number: string;
+  revision_number?: number;
+  purchase_request_id?: number | null;
   supplier_id: number;
   warehouse_id: number;
+  branch_id?: number | null;
   order_date: string;
   expected_delivery_date?: string | null;
   status: 'draft' | 'ordered' | 'received' | 'partially_received' | 'cancelled';
+  approval_status?: 'draft' | 'pending_approval' | 'approved' | 'rejected';
+  approved_by?: number | null;
   currency: string;
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
   total_amount: number;
+  bill_id?: number | null;
   received_at?: string | null;
   notes?: string | null;
   supplier?: SupplierItem | null;
   warehouse?: WarehouseItem | null;
   items?: PurchaseOrderItem[];
+}
+
+export interface GoodsReceiptNoteLine {
+  id: number;
+  goods_receipt_note_id: number;
+  purchase_order_item_id: number;
+  product_id: number;
+  product_variant_id?: number | null;
+  ordered_quantity: number;
+  received_quantity: number;
+  accepted_quantity: number;
+  rejected_damaged_quantity: number;
+  unit_cost: number;
+  rejection_reason?: string | null;
+  notes?: string | null;
+  product?: ProductCatalogItem | null;
+}
+
+export interface GoodsReceiptNoteRecord {
+  id: number;
+  grn_number: string;
+  purchase_order_id: number;
+  warehouse_id: number;
+  received_by: number;
+  status: 'inspected' | 'accepted' | 'rejected' | 'partially_accepted';
+  received_date: string;
+  challan_number?: string | null;
+  invoice_reference?: string | null;
+  qc_notes?: string | null;
+  purchase_order?: PurchaseOrderRecord | null;
+  warehouse?: WarehouseItem | null;
+  receiver?: { id: number; name: string } | null;
+  items?: GoodsReceiptNoteLine[];
+  created_at: string;
+}
+
+export interface StockTransferRecord {
+  id: number;
+  transfer_number: string;
+  source_warehouse_id: number;
+  destination_warehouse_id: number;
+  status: 'draft' | 'pending_approval' | 'approved' | 'in_transit' | 'completed' | 'cancelled';
+  user_id?: number | null;
+  approved_by?: number | null;
+  dispatched_by?: number | null;
+  received_by?: number | null;
+  damaged_quantity?: number;
+  damage_notes?: string | null;
+  shipped_at?: string | null;
+  received_at?: string | null;
+  notes?: string | null;
+  source_warehouse?: WarehouseItem | null;
+  destination_warehouse?: WarehouseItem | null;
+  items?: Array<{
+    id: number;
+    product_id: number;
+    quantity: number;
+    received_quantity?: number;
+    damaged_quantity?: number;
+    notes?: string | null;
+    product?: ProductCatalogItem | null;
+  }>;
+}
+
+export interface StockReconciliationRecord {
+  id: number;
+  reconciliation_number: string;
+  warehouse_id: number;
+  counted_by: number;
+  reconciled_by?: number | null;
+  status: 'in_progress' | 'completed' | 'cancelled';
+  total_variance_cost: number;
+  notes?: string | null;
+  reconciled_at?: string | null;
+  warehouse?: WarehouseItem | null;
+  counter?: { id: number; name: string } | null;
+  reconciler?: { id: number; name: string } | null;
+  items?: Array<{
+    id: number;
+    product_id: number;
+    system_quantity: number;
+    physical_quantity: number;
+    variance_quantity: number;
+    unit_cost: number;
+    variance_cost: number;
+    reconciliation_action: 'adjusted' | 'flagged' | 'ignored';
+    product?: ProductCatalogItem | null;
+  }>;
+}
+
+export interface CustomerReturnRecord {
+  id: number;
+  return_number: string;
+  customer_id: number;
+  invoice_id?: number | null;
+  order_reference?: string | null;
+  warehouse_id: number;
+  status: 'requested' | 'inspecting' | 'restock_approved' | 'damaged_quarantined' | 'refund_approved' | 'completed' | 'rejected';
+  return_reason: string;
+  product_condition: 'unopened' | 'opened_good' | 'defective' | 'damaged_in_transit';
+  restock_action: 'restock_available' | 'quarantine_damage' | 'scrap' | 'return_to_vendor';
+  refund_type: 'credit_note' | 'bank_refund' | 'replacement';
+  credit_note_id?: number | null;
+  total_refund_amount: number;
+  inspection_notes?: string | null;
+  customer?: { id: number; name: string; email?: string } | null;
+  invoice?: { id: number; invoice_number: string; total_amount: number } | null;
+  credit_note?: { id: number; credit_note_number: string; amount: number } | null;
+  warehouse?: WarehouseItem | null;
+  items?: Array<{
+    id: number;
+    product_id: number;
+    quantity: number;
+    unit_price: number;
+    tax_rate: number;
+    is_restocked: boolean;
+    is_damaged: boolean;
+    condition_notes?: string | null;
+    product?: ProductCatalogItem | null;
+  }>;
 }
 
 export interface InventoryValuationData {
@@ -2714,6 +2923,63 @@ export interface WorkflowSimulationResult {
   trace: WorkflowSimulationTraceItem[];
 }
 
+export interface WorkflowApprovalItem {
+  id: number;
+  tenant_id: number;
+  workflow_run_id: number;
+  workflow_id: number;
+  node_id: string;
+  title: string;
+  category: string;
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  approver_role?: string | null;
+  approver_user_id?: number | null;
+  requested_by_user_id?: number | null;
+  action_type?: string | null;
+  action_params?: any;
+  context_summary?: any;
+  comments?: string | null;
+  rejection_reason?: string | null;
+  decision_by_user_id?: number | null;
+  decision_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+  workflow?: WorkflowItem | null;
+  run?: WorkflowRunItem | null;
+  requester?: { id: number; name: string } | null;
+  decisionBy?: { id: number; name: string } | null;
+}
+
+export interface WorkflowAutomationLimitItem {
+  id: number;
+  tenant_id: number;
+  max_active_workflows: number;
+  max_monthly_executions: number;
+  current_month_executions: number;
+  max_external_api_calls: number;
+  max_whatsapp_actions: number;
+  max_email_actions: number;
+  max_sms_actions: number;
+  max_ai_actions: number;
+  max_delayed_tasks: number;
+  last_reset_at?: string | null;
+}
+
+export interface WorkflowMetricsItem {
+  total_workflows: number;
+  active_workflows: number;
+  paused_workflows: number;
+  total_runs: number;
+  completed_runs: number;
+  failed_runs: number;
+  waiting_runs: number;
+  pending_approvals: number;
+  success_rate: number;
+  average_duration_ms: number;
+  monthly_executions: number;
+  monthly_limit: number;
+}
+
 export interface CustomDomainItem {
   id: number;
   tenant_id: number;
@@ -3535,6 +3801,17 @@ export interface HrDashboardMetrics {
 
 // --- PROJECTS, TASKS & MEETINGS MODULE TYPES ---
 
+export interface MilestoneApprovalLogItem {
+  id: number;
+  milestone_id: number;
+  actor_type: 'internal' | 'client';
+  actor_id?: number | null;
+  actor_name?: string | null;
+  action: string;
+  notes?: string | null;
+  created_at: string;
+}
+
 export interface ProjectMilestoneItem {
   id: number;
   project_id: number;
@@ -3543,7 +3820,18 @@ export interface ProjectMilestoneItem {
   due_date?: string | null;
   status: 'pending' | 'in_progress' | 'completed';
   progress: number;
+  amount?: number;
+  billing_percentage?: number;
+  deliverables_summary?: string | null;
+  approval_status?: 'pending_review' | 'internal_approved' | 'sent_to_client' | 'client_approved' | 'revision_requested' | 'rejected';
+  client_review_token?: string | null;
+  client_feedback?: string | null;
+  internal_reviewed_by?: number | null;
+  internal_reviewed_at?: string | null;
+  client_approved_at?: string | null;
+  order_index?: number;
   completed_at?: string | null;
+  approval_logs?: MilestoneApprovalLogItem[];
   created_at: string;
   updated_at: string;
 }
@@ -3568,29 +3856,148 @@ export interface ProjectTeamMember {
   };
 }
 
+export interface ProjectStatusHistoryItem {
+  id: number;
+  project_id: number;
+  from_status?: string | null;
+  to_status: string;
+  changed_by_user_id?: number | null;
+  changed_by_user?: { id: number; name: string } | null;
+  reason?: string | null;
+  created_at: string;
+}
+
+export interface ProjectDocumentItem {
+  id: number;
+  project_id: number;
+  uploaded_by_user_id?: number | null;
+  uploaded_by_user?: { id: number; name: string } | null;
+  title: string;
+  name?: string;
+  file_name: string;
+  file_path: string;
+  file_size_kb?: number | null;
+  mime_type?: string | null;
+  category: 'deliverable' | 'design' | 'agreement' | 'spec' | 'invoice' | 'other';
+  version: number;
+  is_client_visible: boolean;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectFinancialMetrics {
+  project_id: number;
+  budget: number;
+  invoiced_revenue: number;
+  collected_revenue: number;
+  outstanding_revenue: number;
+  actual_expenses: number;
+  labor_costs: number;
+  total_costs: number;
+  billable_hours: number;
+  non_billable_hours: number;
+  billable_revenue_potential: number;
+  gross_profit: number;
+  profit_margin_percentage: number;
+  cost_variance: number;
+}
+
+export interface TeamWorkloadItem {
+  user_id: number;
+  name: string;
+  email: string;
+  active_tasks_count: number;
+  completed_tasks_count: number;
+  overdue_tasks_count: number;
+  estimated_hours: number;
+  logged_hours: number;
+  capacity_hours: number;
+  utilization_percentage: number;
+  is_overloaded: boolean;
+}
+
+export interface GanttChartData {
+  project: {
+    id: number;
+    name: string;
+    code?: string;
+    start_date?: string | null;
+    end_date?: string | null;
+    progress: number;
+    status: string;
+  };
+  milestones: Array<{
+    id: number;
+    title: string;
+    due_date?: string | null;
+    status: string;
+    approval_status?: string;
+    progress: number;
+    amount: number;
+  }>;
+  tasks: Array<{
+    id: number;
+    title: string;
+    status: string;
+    priority: string;
+    start_date?: string | null;
+    due_date?: string | null;
+    estimated_hours: number;
+    is_blocked: boolean;
+    block_reason?: string | null;
+    parent_task_id?: number | null;
+    milestone_id?: number | null;
+    milestone_title?: string | null;
+    assigned_user?: {
+      id: number;
+      name: string;
+    } | null;
+    dependencies: Array<{
+      depends_on_task_id: number;
+      title: string;
+      dependency_type: string;
+      lag_days: number;
+    }>;
+    subtasks_count: number;
+  }>;
+}
+
 export interface ProjectItem {
   id: number;
   tenant_id?: number;
+  code?: string;
   customer_id?: number | null;
   company_id?: number | null;
+  deal_id?: number | null;
+  quotation_id?: number | null;
+  branch_id?: number | null;
   owner_id?: number | null;
+  manager_user_id?: number | null;
   name: string;
   description?: string | null;
-  status: 'not_started' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  notes?: string | null;
+  status: 'draft' | 'planned' | 'active' | 'not_started' | 'in_progress' | 'on_hold' | 'at_risk' | 'completed' | 'cancelled' | 'archived';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   budget: number;
+  labor_cost_rate?: number;
+  billing_rate?: number;
   estimated_hours: number;
   start_date?: string | null;
   end_date?: string | null;
   progress: number;
+  client_portal_enabled?: boolean;
   is_archived: boolean;
   archived_at?: string | null;
   completed_at?: string | null;
   customer?: { id: number; name: string } | null;
   company?: { id: number; name: string } | null;
   owner?: { id: number; name: string; email?: string } | null;
+  manager?: { id: number; name: string; email?: string } | null;
   team_members?: ProjectTeamMember[];
   milestones?: ProjectMilestoneItem[];
+  documents?: ProjectDocumentItem[];
+  status_histories?: ProjectStatusHistoryItem[];
   tasks_count?: number;
   milestones_count?: number;
   created_at: string;
@@ -3602,12 +4009,14 @@ export interface TaskDependencyItem {
   task_id: number;
   depends_on_task_id: number;
   dependency_type: 'finish_to_start' | 'start_to_start';
+  lag_days?: number;
   depends_on_task?: TaskItem;
   created_at: string;
 }
 
 export interface TaskTimeLogItem {
   id: number;
+  project_id?: number | null;
   task_id: number;
   user_id?: number | null;
   start_time?: string | null;
@@ -3615,7 +4024,16 @@ export interface TaskTimeLogItem {
   duration_minutes: number;
   description?: string | null;
   is_billable: boolean;
+  hourly_rate?: number;
+  billable_amount?: number;
+  is_running?: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
+  approved_by_user_id?: number | null;
+  approved_at?: string | null;
+  rejection_reason?: string | null;
   user?: { id: number; name: string; email?: string } | null;
+  approved_by_user?: { id: number; name: string } | null;
+  task?: TaskItem | null;
   created_at: string;
 }
 
@@ -5519,6 +5937,835 @@ export interface AiAnswerSuggestion {
     slug: string;
   }>;
 }
+
+// -------------------------------------------------------------------------
+// PROMPT 45: Advanced Multi-Branch and Multi-Location Business Management
+// -------------------------------------------------------------------------
+
+export interface BranchItem {
+  id: number;
+  name: string;
+  code: string;
+  city?: string | null;
+  state?: string | null;
+  country: string;
+  timezone: string;
+  is_active: boolean;
+  manager_user_id?: number | null;
+  manager?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  email?: string | null;
+  phone?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  pincode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  business_hours?: Record<string, any> | null;
+  working_days?: string[] | null;
+  connected_channels?: Record<string, any> | null;
+  settings?: Record<string, any> | null;
+  departments?: Array<{ id: number; name: string }>;
+  users_count?: number;
+  employees_count?: number;
+  leads_count?: number;
+  deals_count?: number;
+  projects_count?: number;
+  support_tickets_count?: number;
+  customers_count?: number;
+  meetings_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BranchTransferItem {
+  id: number;
+  transferable_type: string;
+  transferable_id: number;
+  from_branch_id?: number | null;
+  to_branch_id: number;
+  initiated_by_user_id: number;
+  approved_by_user_id?: number | null;
+  status: string;
+  reason?: string | null;
+  approval_notes?: string | null;
+  metadata?: Record<string, any> | null;
+  transferred_at?: string | null;
+  created_at: string;
+  from_branch?: { id: number; name: string; code: string } | null;
+  to_branch?: { id: number; name: string; code: string } | null;
+  initiated_by?: { id: number; name: string; email: string } | null;
+}
+
+export interface BranchSalesTargetItem {
+  id: number;
+  branch_id: number;
+  period_type: string;
+  period_year: number;
+  period_number?: number | null;
+  target_amount: number;
+  achieved_amount: number;
+  target_leads: number;
+  achieved_leads: number;
+  target_deals: number;
+  achieved_deals: number;
+  notes?: string | null;
+  created_at?: string;
+}
+
+export interface BranchDashboardMetrics {
+  branch: {
+    id: number;
+    name: string;
+    code: string;
+    city?: string | null;
+    state?: string | null;
+    manager?: { id: number; name: string } | null;
+  };
+  leads: {
+    total: number;
+    converted: number;
+    conversion_rate_percentage: number;
+  };
+  customers: {
+    new_count: number;
+  };
+  deals: {
+    total_count: number;
+    won_count: number;
+    pipeline_value: number;
+    won_value: number;
+  };
+  sales: {
+    invoiced_revenue: number;
+    collected_revenue: number;
+    pending_receivables: number;
+    expenses: number;
+    net_profit: number;
+  };
+  employees: {
+    total_headcount: number;
+    active_headcount: number;
+  };
+  support: {
+    total_tickets: number;
+    open_tickets: number;
+    sla_breached: number;
+  };
+  appointments: {
+    upcoming: number;
+  };
+  projects: {
+    total: number;
+    active: number;
+    completed: number;
+  };
+  targets: {
+    target_amount: number;
+    achieved_amount: number;
+    progress_percentage: number;
+  };
+}
+
+export interface ConsolidatedBranchAnalytics {
+  summary: {
+    total_branches: number;
+    active_branches: number;
+    total_leads: number;
+    total_sales: number;
+    total_collections: number;
+    total_expenses: number;
+    net_profit: number;
+    total_outstanding: number;
+    total_employees: number;
+    total_open_tickets: number;
+    collection_efficiency_percentage: number;
+  };
+  branch_comparisons: Array<{
+    branch_id: number;
+    name: string;
+    code: string;
+    city?: string | null;
+    state?: string | null;
+    is_active: boolean;
+    manager_name: string;
+    leads_count: number;
+    conversion_rate: number;
+    deals_count: number;
+    won_value: number;
+    sales_invoiced: number;
+    collections: number;
+    expenses: number;
+    net_profit: number;
+    outstanding: number;
+    employees_count: number;
+    open_tickets: number;
+    target_achievement_percentage: number;
+  }>;
+}
+
+// -----------------------------------------------------------------------------
+// PROMPT 46: Customer Self-Service Portal & Appointment Booking
+// -----------------------------------------------------------------------------
+export interface CustomerAccountItem {
+  id: number;
+  tenant_id: number;
+  customer_id: number;
+  email: string;
+  phone?: string | null;
+  is_active: boolean;
+  email_verified_at?: string | null;
+  two_factor_enabled: boolean;
+  last_login_at?: string | null;
+  last_login_ip?: string | null;
+  invite_token?: string | null;
+  invite_expires_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  customer?: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string | null;
+    tier?: string;
+    company?: { id: number; name: string } | null;
+    branch?: { id: number; name: string } | null;
+  };
+}
+
+export interface CustomerLoginHistoryItem {
+  id: number;
+  customer_account_id: number;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  status: 'success' | 'failed';
+  created_at: string;
+}
+
+export interface PortalSettingItem {
+  id: number;
+  tenant_id: number;
+  is_portal_enabled: boolean;
+  allow_self_registration: boolean;
+  allow_invoice_access: boolean;
+  allow_payments: boolean;
+  allow_project_tracking: boolean;
+  allow_ticket_creation: boolean;
+  allow_appointment_booking: boolean;
+  allow_document_downloads: boolean;
+  public_booking_page_enabled: boolean;
+  booking_slug?: string | null;
+  company_logo_url?: string | null;
+  brand_color?: string;
+  booking_terms?: string | null;
+  booking_rules?: Record<string, any> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BookableServiceItem {
+  id: number;
+  tenant_id: number;
+  branch_id?: number | null;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  duration_minutes: number;
+  price: number;
+  currency: string;
+  requires_advance_payment: boolean;
+  advance_amount: number;
+  assigned_staff_ids?: number[] | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  branch?: {
+    id: number;
+    name: string;
+  } | null;
+}
+
+export interface CustomerDashboardData {
+  profile: {
+    customer_id: number;
+    name: string;
+    email: string;
+    phone?: string | null;
+    tier?: string;
+    company?: { id: number; name: string } | null;
+    branch?: { id: number; name: string } | null;
+  };
+  financials: {
+    total_invoiced: number;
+    total_paid: number;
+    outstanding_due: number;
+  };
+  counts: {
+    pending_quotations: number;
+    active_projects: number;
+    open_support_tickets: number;
+    upcoming_appointments: number;
+  };
+  recent_invoices: Array<{
+    id: number;
+    invoice_number: string;
+    total_amount: number;
+    paid_amount: number;
+    outstanding_amount: number;
+    status: string;
+    due_date?: string | null;
+    issued_at?: string | null;
+  }>;
+  recent_quotations: Array<{
+    id: number;
+    quote_number: string;
+    total_amount: number;
+    status: string;
+    valid_until?: string | null;
+    accepted_at?: string | null;
+    created_at?: string;
+  }>;
+  recent_appointments: Array<{
+    id: number;
+    booking_reference?: string | null;
+    title: string;
+    meeting_date: string;
+    start_time: string;
+    end_time: string;
+    status: string;
+    service?: { id: number; name: string; duration_minutes: number } | null;
+  }>;
+}
+
+export interface PublicBookingConfig {
+  tenant: {
+    id: number;
+    name: string;
+  };
+  branding: {
+    brand_color: string;
+    company_logo_url?: string | null;
+    booking_terms?: string | null;
+    booking_rules?: Record<string, any> | null;
+  };
+  services: BookableServiceItem[];
+  branches: Array<{
+    id: number;
+    name: string;
+    code: string;
+    city?: string | null;
+    state?: string | null;
+  }>;
+}
+
+export interface PublicBookingSlot {
+  start_time: string;
+  end_time: string;
+  available: boolean;
+}
+
+// ----------------------------------------------------
+// Prompt 49: Advanced Analytics, BI Widgets & Field Sales
+// ----------------------------------------------------
+
+export interface OwnerDashboardMetrics {
+  period: {
+    from_date: string;
+    to_date: string;
+    formatted_ist: string;
+  };
+  actuals: {
+    total_leads: number;
+    new_leads: number;
+    qualified_leads: number;
+    converted_leads: number;
+    lead_conversion_rate: number;
+    total_customers: number;
+    new_customers: number;
+    repeat_customers: number;
+    customer_retention_rate: number;
+    total_deals: number;
+    won_deals_count: number;
+    won_revenue: number;
+    won_revenue_inr: string;
+    won_revenue_short: string;
+    collected_revenue: number;
+    collected_revenue_inr: string;
+    collected_revenue_short: string;
+    invoiced_sales: number;
+    invoiced_sales_inr: string;
+    invoiced_sales_short: string;
+    pending_payments: number;
+    pending_payments_inr: string;
+    pending_payments_short: string;
+    overdue_invoices: number;
+    overdue_invoices_inr: string;
+    monthly_expenses: number;
+    monthly_expenses_inr: string;
+    monthly_expenses_short: string;
+    net_profit: number;
+    net_profit_short: string;
+  };
+  forecasts: {
+    pipeline_value: number;
+    pipeline_value_inr: string;
+    pipeline_value_short: string;
+    weighted_pipeline_forecast: number;
+    weighted_forecast_inr: string;
+    weighted_forecast_short: string;
+    committed_forecast: number;
+    committed_forecast_short: string;
+    best_case_forecast: number;
+    best_case_forecast_short: string;
+    forecast_disclaimer: string;
+  };
+  operations: {
+    support_tickets: {
+      total: number;
+      open: number;
+      resolved: number;
+      sla_breached: number;
+    };
+    projects: {
+      total: number;
+      active: number;
+      completed: number;
+    };
+  };
+  performance: {
+    branches: Array<{
+      branch_id: number;
+      name: string;
+      code: string;
+      leads_count: number;
+      sales_revenue: number;
+      expenses: number;
+      net_margin: number;
+      sales_formatted: string;
+    }>;
+    employees: Array<{
+      employee_id: number;
+      name: string;
+      department: string;
+      leads_count: number;
+      sales_won: number;
+      sales_won_formatted: string;
+    }>;
+    campaigns: Array<{
+      id: number;
+      name: string;
+      channel: string;
+      spend: number;
+      leads_generated: number;
+      roi_percent: number;
+      spend_formatted: string;
+    }>;
+  };
+}
+
+export interface DashboardWidgetLayoutItem {
+  id: number;
+  tenant_id: number;
+  user_id?: number | null;
+  role?: string | null;
+  name: string;
+  is_default: boolean;
+  widgets: Array<{
+    id: string;
+    type: string;
+    title?: string;
+    metric?: string;
+    chart_type?: string;
+    w: number;
+    h: number;
+  }>;
+  filters?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomReportModuleCatalog {
+  [moduleKey: string]: {
+    name: string;
+    fields: Array<{
+      key: string;
+      label: string;
+      type: string;
+      is_currency?: boolean;
+    }>;
+    relations: string[];
+  };
+}
+
+export interface CustomReportPreviewResult {
+  module: string;
+  module_name: string;
+  total_records: number;
+  columns: string[];
+  rows: Array<Record<string, any>>;
+  aggregations: Record<string, number>;
+  grouped: Array<{
+    group_key: string;
+    count: number;
+    total_value: number;
+  }>;
+  chart_type: string;
+}
+
+export interface CustomAnalyticsAlertItem {
+  id: number;
+  tenant_id: number;
+  user_id: number;
+  name: string;
+  metric_type: string;
+  condition_operator: string;
+  threshold_value: number;
+  notification_channels: string[];
+  branch_id?: number | null;
+  is_active: boolean;
+  last_triggered_at?: string | null;
+  last_payload?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FieldSalesVisitItem {
+  id: number;
+  tenant_id: number;
+  employee_id: number;
+  customer_id?: number | null;
+  lead_id?: number | null;
+  branch_id?: number | null;
+  title: string;
+  status: 'scheduled' | 'checked_in' | 'completed' | 'cancelled' | 'missed';
+  scheduled_at: string;
+  check_in_at?: string | null;
+  check_in_lat?: number | null;
+  check_in_lng?: number | null;
+  check_in_address?: string | null;
+  check_out_at?: string | null;
+  check_out_lat?: number | null;
+  check_out_lng?: number | null;
+  check_out_address?: string | null;
+  distance_travelled_km: number;
+  visit_notes?: string | null;
+  outcome?: string | null;
+  follow_up_date?: string | null;
+  follow_up_task_id?: number | null;
+  travel_expense_amount: number;
+  travel_expense_id?: number | null;
+  route_waypoints?: any[] | null;
+  is_offline_synced: boolean;
+  offline_client_uuid?: string | null;
+  employee?: any;
+  customer?: any;
+  lead?: any;
+  branch?: any;
+  created_at: string;
+}
+
+export interface FieldSalesDailyPlan {
+  date: string;
+  date_formatted_ist: string;
+  employee?: {
+    id: number;
+    name: string;
+    department: string;
+  } | null;
+  total_visits_planned: number;
+  completed_count: number;
+  pending_count: number;
+  total_distance_km: number;
+  visits: FieldSalesVisitItem[];
+}
+
+export interface FieldSalesAnalytics {
+  period: {
+    from_date: string;
+    to_date: string;
+  };
+  kpis: {
+    total_visits: number;
+    completed_visits: number;
+    completion_rate: number;
+    total_distance_km: number;
+    total_expense_claims: number;
+    total_expense_claims_inr: string;
+  };
+  outcomes: Record<string, number>;
+  by_employee: Array<{
+    employee_id: number;
+    name: string;
+    total_visits: number;
+    completed_visits: number;
+    total_distance_km: number;
+    deals_closed_count: number;
+    expense_claims: number;
+  }>;
+  by_branch: Array<{
+    branch_id: number;
+    name: string;
+    total_visits: number;
+    completed_visits: number;
+    total_distance_km: number;
+    deals_closed_count: number;
+  }>;
+}
+
+export interface AiBusinessInsightsItem {
+  insight_key: string;
+  title: string;
+  category: string;
+  type: 'warning' | 'opportunity' | 'trend' | 'action_required';
+  supporting_data: Record<string, any>;
+  date_range: string;
+  related_records: number[];
+  explanation: string;
+  suggested_action: string;
+  confidence: number;
+  limitations: string;
+}
+
+export interface IndiaSettingsItem {
+  currency: {
+    code: string;
+    symbol: string;
+    numbering_system: string;
+    sample_formatted: string;
+    sample_short: string;
+  };
+  timezone: {
+    default: string;
+    offset: string;
+    current_time_ist: string;
+    is_business_hours: boolean;
+    business_hours_schedule: string;
+  };
+  phone_validation: {
+    country_code: string;
+    format: string;
+  };
+  holidays: Array<{
+    name: string;
+    date: string;
+    type: string;
+  }>;
+  languages: {
+    available: string[];
+    dictionaries: Record<string, Record<string, string>>;
+  };
+  upi_qr_standard: string;
+}
+
+// --------------------------------------------------------------------
+// PROMPT 50: Enterprise Multi-Tenant SaaS & Super Admin Types
+// --------------------------------------------------------------------
+export interface IndustryTemplateItem {
+  id: number;
+  template_code: string;
+  name: string;
+  industry_sector: string;
+  description: string;
+  icon: string;
+  pipeline_stages: Array<{ name: string; probability: number; description?: string }>;
+  custom_fields: Array<{ model: string; name: string; label: string; type: string; options?: string[]; required?: boolean }>;
+  dashboard_widgets: Array<{ id: string; name: string; type: string; width: number }>;
+  recommended_automations: Array<{ name: string; trigger: string; action: string; description?: string }>;
+  reports_config?: any;
+  is_active: boolean;
+  version: string;
+}
+
+export interface TenantAppliedTemplateItem {
+  id: number;
+  tenant_id: number;
+  industry_template_id: number;
+  applied_by_user_id?: number | null;
+  status: 'active' | 'customized' | 'disabled';
+  custom_overrides?: any;
+  applied_at: string;
+  template?: IndustryTemplateItem;
+}
+
+export interface FeatureEntitlementCatalog {
+  plan_code: string;
+  is_suspended: boolean;
+  suspension_reason?: string | null;
+  entitlements: Record<string, {
+    enabled: boolean;
+    tier_required: string;
+    display_name: string;
+    category: string;
+    description: string;
+    limit?: number;
+    usage?: number;
+    has_rbac_permission?: boolean;
+  }>;
+}
+
+export interface FeatureEntitlementVerification {
+  feature_key: string;
+  permitted: boolean;
+  reason?: string | null;
+  plan_code?: string;
+  upgrade_url?: string;
+  status_code?: number;
+  entitlement?: any;
+}
+
+export interface PlatformConsoleOverview {
+  platform_name: string;
+  environment: string;
+  generated_at: string;
+  stats: {
+    total_tenants: number;
+    active_tenants: number;
+    trialing_tenants: number;
+    suspended_tenants: number;
+    total_users: number;
+    active_subscriptions: number;
+  };
+  mrr_inr: number;
+  arr_inr: number;
+  usage_stats: {
+    total_leads: number;
+    total_deals: number;
+    total_invoices: number;
+    total_revenue_collected_inr: number;
+  };
+  system_health: {
+    database: string;
+    cache: string;
+    queue: string;
+    storage_writable: boolean;
+    php_version: string;
+    laravel_version: string;
+  };
+  recent_tenants: Array<{
+    id: number;
+    name: string;
+    email: string;
+    status: string;
+    created_at: string;
+    owner_name?: string;
+    current_plan?: string;
+  }>;
+}
+
+export interface PlatformTenantItem {
+  id: number;
+  name: string;
+  slug: string;
+  email: string;
+  phone?: string | null;
+  status: string;
+  suspended_at?: string | null;
+  suspension_reason?: string | null;
+  industry_template_code?: string | null;
+  created_at: string;
+  owner?: { id: number; name: string; email: string };
+  current_subscription?: {
+    id: number;
+    plan_name: string;
+    status: string;
+    billing_cycle: string;
+    current_period_end?: string | null;
+  };
+}
+
+export interface PlatformPlanItem {
+  id: number;
+  name: string;
+  slug: string;
+  price_monthly: number;
+  price_yearly: number;
+  currency: string;
+  limits: Record<string, any>;
+  features: string[];
+  is_active: boolean;
+}
+
+export interface PlatformAnnouncementItem {
+  id: number;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'critical' | 'release';
+  target_audience: 'all' | 'specific_tenants' | 'admins_only';
+  target_tenant_ids?: number[] | null;
+  starts_at?: string | null;
+  expires_at?: string | null;
+  is_dismissible: boolean;
+  action_url?: string | null;
+  created_at: string;
+}
+
+export interface PlatformBackupRecordItem {
+  id: number;
+  file_name: string;
+  backup_type: string;
+  size_bytes: number;
+  size_formatted: string;
+  checksum_sha256?: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  storage_driver: string;
+  encryption_enabled: boolean;
+  metadata?: any;
+  created_at: string;
+  completed_at?: string | null;
+}
+
+export interface PlatformRevenueReport {
+  generated_at: string;
+  currency: string;
+  summary: {
+    total_invoiced_inr: number;
+    total_collected_inr: number;
+    pending_revenue_inr: number;
+    total_gst_collected_inr: number;
+    mrr_inr: number;
+    arr_inr: number;
+  };
+  monthly_breakdown: Record<string, {
+    invoiced: number;
+    collected: number;
+    tax: number;
+    invoice_count: number;
+  }>;
+  gst_tax_breakdown: {
+    hsn_sac: string;
+    taxable_amount: number;
+    cgst_9_pct: number;
+    sgst_9_pct: number;
+    igst_18_pct: number;
+    total_gst: number;
+  };
+}
+
+export interface SaasOnboardingRegisterPayload {
+  organization_name: string;
+  owner_name: string;
+  email: string;
+  password?: string;
+  phone?: string;
+  business_type?: string;
+  industry_template_code?: string;
+  plan_code?: string;
+  billing_cycle?: 'monthly' | 'yearly';
+  timezone?: string;
+  state_code?: string;
+  gstin?: string;
+}
+
+export interface SaasOnboardingStepPayload {
+  step_number: number;
+  step_data: Record<string, any>;
+}
+
+
+
 
 
 
